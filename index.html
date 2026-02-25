@@ -757,7 +757,11 @@ function drawEdit(el){
           var id=parseInt(e.target.getAttribute('data-id'));
           var clicked=e.target.getAttribute('data-word');
           for(var k=0;k<S.words.length;k++){
-            if(S.words[k].id===id){S.words[k].blank=clicked;break}
+            if(S.words[k].id===id){
+              S.words[k].blank=clicked;
+              S.words[k].word=clicked;
+              break;
+            }
           }
           draw();
         };
@@ -785,7 +789,13 @@ function drawEdit(el){
         inputs[j].oninput=function(e){
           var id=parseInt(e.target.getAttribute('data-id'));
           var f=e.target.getAttribute('data-f');
-          for(var k=0;k<S.words.length;k++){if(S.words[k].id===id){S.words[k][f]=e.target.value;break}}
+          for(var k=0;k<S.words.length;k++){
+            if(S.words[k].id===id){
+              S.words[k][f]=e.target.value;
+              if(f==='word')S.words[k].blank=e.target.value;
+              break;
+            }
+          }
         };
       }
       tb.appendChild(tr);
@@ -804,19 +814,37 @@ function drawPreview(el){
     var blankWord=ww.blank||ww.word;
     var bw=Math.max(150,(blankWord||'').length*13);
     var ex;
+    var phrase=ww.phrase||'';
+    
+    // Case-insensitive word boundary match
+    function findBlank(ph,bw){
+      var lower=ph.toLowerCase();
+      var blower=bw.toLowerCase();
+      var idx=lower.indexOf(blower);
+      if(idx>=0)return idx;
+      // Try matching word forms (e.g., "business" in "business district")
+      var words=ph.split(/\s+/);
+      var pos=0;
+      for(var w2=0;w2<words.length;w2++){
+        if(words[w2].toLowerCase()===blower)return pos;
+        pos+=words[w2].length+1;
+      }
+      return -1;
+    }
+    
+    var matchIdx=findBlank(phrase,blankWord);
+    
     if(bl.word){
-      if(ww.phrase&&blankWord&&ww.phrase.toLowerCase().indexOf(blankWord.toLowerCase())>=0){
-        var idx=ww.phrase.toLowerCase().indexOf(blankWord.toLowerCase());
-        ex=esc(ww.phrase.slice(0,idx))+'<span class="bl" style="width:'+bw+'px">&nbsp;</span>'+esc(ww.phrase.slice(idx+blankWord.length));
+      if(matchIdx>=0){
+        ex=esc(phrase.slice(0,matchIdx))+'<span class="bl" style="width:'+bw+'px">&nbsp;</span>'+esc(phrase.slice(matchIdx+blankWord.length));
       }else{
-        ex='<span class="bl" style="width:'+bw+'px">&nbsp;</span> '+esc(ww.phrase);
+        ex='<span class="bl" style="width:'+bw+'px">&nbsp;</span> '+esc(phrase);
       }
     }else{
-      if(ww.phrase&&blankWord&&ww.phrase.toLowerCase().indexOf(blankWord.toLowerCase())>=0){
-        var idx=ww.phrase.toLowerCase().indexOf(blankWord.toLowerCase());
-        ex=esc(ww.phrase.slice(0,idx))+'<b>'+esc(ww.phrase.slice(idx,idx+blankWord.length))+'</b>'+esc(ww.phrase.slice(idx+blankWord.length));
+      if(matchIdx>=0){
+        ex=esc(phrase.slice(0,matchIdx))+'<b>'+esc(phrase.slice(matchIdx,matchIdx+blankWord.length))+'</b>'+esc(phrase.slice(matchIdx+blankWord.length));
       }else{
-        ex='<b>'+esc(blankWord)+'</b> '+esc((ww.phrase||''));
+        ex='<b>'+esc(blankWord)+'</b> '+esc(phrase);
       }
     }
     var df=bl.def?'<span class="bl" style="width:92%">&nbsp;</span>':esc(ww.def);
