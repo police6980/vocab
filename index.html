@@ -839,6 +839,21 @@ function drawEdit(el){
 }
 
 /*-- Preview --*/
+function findBlankIdx(ph,blk){
+  if(!ph||!blk)return -1;
+  var lower=ph.toLowerCase();
+  var blower=blk.toLowerCase();
+  var idx=lower.indexOf(blower);
+  if(idx>=0)return idx;
+  var words=ph.split(/\s+/);
+  var pos=0;
+  for(var w2=0;w2<words.length;w2++){
+    if(words[w2].toLowerCase()===blower)return pos;
+    pos+=words[w2].length+1;
+  }
+  return -1;
+}
+
 function drawPreview(el){
   var w=S.words,bl=S.blanks;
   var lb=[];if(bl.word)lb.push('영어 단어');if(bl.kor)lb.push('한국어 뜻');if(bl.def)lb.push('영영풀이');
@@ -850,24 +865,7 @@ function drawPreview(el){
     var bw=Math.max(150,(blankWord||'').length*13);
     var ex;
     var phrase=ww.phrase||'';
-    
-    // Case-insensitive word boundary match
-    function findBlank(ph,bw){
-      var lower=ph.toLowerCase();
-      var blower=bw.toLowerCase();
-      var idx=lower.indexOf(blower);
-      if(idx>=0)return idx;
-      // Try matching word forms (e.g., "business" in "business district")
-      var words=ph.split(/\s+/);
-      var pos=0;
-      for(var w2=0;w2<words.length;w2++){
-        if(words[w2].toLowerCase()===blower)return pos;
-        pos+=words[w2].length+1;
-      }
-      return -1;
-    }
-    
-    var matchIdx=findBlank(phrase,blankWord);
+    var matchIdx=findBlankIdx(phrase,blankWord);
     
     if(bl.word){
       if(matchIdx>=0){
