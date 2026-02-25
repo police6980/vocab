@@ -442,47 +442,78 @@ function callAPI(parts){
   }
 
   var apiUrl='https://vocab-proxy.police6980.workers.dev';
-  fetch(apiUrl,{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key':S.apiKey,
-      'anthropic-version':'2023-06-01'
-    },
-    body:JSON.stringify({
-      model:'claude-haiku-4-5-20251001',
-      max_tokens:8192,
-      messages:[{role:'user',content:parts}]
-    })
-  })
-  .then(function(resp){
-    return resp.json().then(function(data){
-      if(!resp.ok){
-        var msg=data.error?data.error.message:'HTTP '+resp.status;
-        throw new Error(msg);
+  var models=['claude-haiku-4-5-20251001','claude-sonnet-4-20250514'];
+  var bodyBase={max_tokens:8192,messages:[{role:'user',content:parts}]};
+
+  function tryCall(modelIdx,attempt){
+    var model=models[modelIdx];
+    var maxAttempt=3;
+    upd({error:null});
+    if(attempt>0){
+      var el=document.querySelector('.err')||document.querySelector('.upload-box');
+      if(el){
+        var info=document.createElement('div');
+        info.style.cssText='color:var(--acc);font-size:13px;text-align:center;padding:6px';
+        info.textContent='⏳ 재시도 중... ('+model+', '+(attempt+1)+'/'+maxAttempt+'회)';
+        el.parentNode&&el.parentNode.insertBefore(info,el);
       }
-      return data;
-    });
-  })
-  .then(function(data){
-    var raw=(data.content||[]).map(function(c){return c.text||''}).join('');
-    var m=raw.match(/\[[\s\S]*\]/);
-    if(!m)throw new Error('JSON을 찾을 수 없습니다');
-    var arr=JSON.parse(m[0]);
-    var title='Vocabulary Worksheet';
-    var words=[];var id=1;
-    for(var i=0;i<arr.length;i++){
-      var x=arr[i];
-      if(x._title){title=x._title+' - Vocabulary Worksheet';continue}
-      if(x.word){words.push({id:id++,word:x.word,phrase:x.phrase||'',pos:x.pos||'n',def:x.def||'',kor:x.kor||'',synonym:x.synonym||''})}
     }
-    if(!words.length)throw new Error('추출된 단어가 없습니다');
-    upd({title:title,words:words,view:'edit',loading:false,error:null});
-  })
-  .catch(function(e){
-    console.error(e);
-    upd({loading:false,error:'❌ '+e.message});
-  });
+
+    var body=JSON.parse(JSON.stringify(bodyBase));
+    body.model=model;
+
+    fetch(apiUrl,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':S.apiKey,
+        'anthropic-version':'2023-06-01'
+      },
+      body:JSON.stringify(body)
+    })
+    .then(function(resp){
+      return resp.json().then(function(data){
+        if(!resp.ok){
+          var msg=data.error?data.error.message:'HTTP '+resp.status;
+          // Overloaded or rate limit → retry
+          if((resp.status===529||resp.status===429||msg.toLowerCase().indexOf('overload')>=0)&&attempt<maxAttempt-1){
+            var delay=3000*(attempt+1);
+            setTimeout(function(){tryCall(modelIdx,attempt+1)},delay);
+            return null;
+          }
+          // All retries failed for this model → try next model
+          if((resp.status===529||resp.status===429||msg.toLowerCase().indexOf('overload')>=0)&&modelIdx<models.length-1){
+            setTimeout(function(){tryCall(modelIdx+1,0)},2000);
+            return null;
+          }
+          throw new Error(msg);
+        }
+        return data;
+      });
+    })
+    .then(function(data){
+      if(!data)return; // retry in progress
+      var raw=(data.content||[]).map(function(c){return c.text||''}).join('');
+      var m=raw.match(/\[[\s\S]*\]/);
+      if(!m)throw new Error('JSON을 찾을 수 없습니다');
+      var arr=JSON.parse(m[0]);
+      var title='Vocabulary Worksheet';
+      var words=[];var id=1;
+      for(var i=0;i<arr.length;i++){
+        var x=arr[i];
+        if(x._title){title=x._title+' - Vocabulary Worksheet';continue}
+        if(x.word){words.push({id:id++,word:x.word,phrase:x.phrase||'',pos:x.pos||'n',def:x.def||'',kor:x.kor||'',synonym:x.synonym||''})}
+      }
+      if(!words.length)throw new Error('추출된 단어가 없습니다');
+      upd({title:title,words:words,view:'edit',loading:false,error:null});
+    })
+    .catch(function(e){
+      console.error(e);
+      upd({loading:false,error:'❌ '+e.message});
+    });
+  }
+
+  tryCall(0,0);
 }
 
 /*========================================
