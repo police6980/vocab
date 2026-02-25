@@ -92,6 +92,7 @@ body{font-family:-apple-system,'Malgun Gothic','Noto Sans KR',sans-serif;backgro
 .mbtn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit}
 .mbtn.cam{background:#4a9eff;color:#fff}
 .mbtn.gal{background:#f0f0f0;color:#333}
+.mbtn.solo{background:#c8a96e;color:#2c2825}
 .mst{margin-top:12px;padding:10px;border-radius:8px;font-size:13px}
 .mst.w{background:#fef9e7;color:#8a6d00}
 .mst.g{background:#e8f8e8;color:#2d7a2d}
@@ -99,6 +100,7 @@ body{font-family:-apple-system,'Malgun Gothic','Noto Sans KR',sans-serif;backgro
 .mst.d{background:#e8f8e8;color:#2d7a2d}
 .mst.e{background:#fef2f2;color:#9b2c2c}
 .mimg{max-width:100%;max-height:160px;border-radius:6px;margin-top:8px}
+.mlog{margin-top:8px;padding:8px;background:#f8f8f8;border-radius:6px;font-size:10px;color:#888;text-align:left;max-height:120px;overflow-y:auto;font-family:monospace}
 
 .footer{text-align:center;padding:20px 0 8px;font-size:9px;color:#c0b8a8;letter-spacing:2px}
 @keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin .8s linear infinite;display:inline-block}
@@ -144,15 +146,30 @@ function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace
 function shuffle(a){var b=a.slice();for(var i=b.length-1;i>0;i--){var j=0|Math.random()*(i+1);var t=b[i];b[i]=b[j];b[j]=t}return b}
 function toB64(f){return new Promise(function(ok,no){var r=new FileReader();r.onload=function(){ok(r.result.split(',')[1])};r.onerror=no;r.readAsDataURL(f)})}
 
+// Detect mobile
+function isMobile(){return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)}
+
 /*========================================
   MOBILE MODE CHECK
 ========================================*/
 var _conn=new URLSearchParams(location.search).get('connect');
+var _peerLoaded=typeof Peer!=='undefined';
+var _peerCallbacks=[];
+function onPeerReady(fn){if(_peerLoaded)fn();else _peerCallbacks.push(fn)}
+function _peerDone(){_peerLoaded=true;_peerCallbacks.forEach(function(f){f()});_peerCallbacks=[]}
 
 if(_conn){
-  document.addEventListener('DOMContentLoaded',function(){bootMobile(_conn)});
+  document.addEventListener('DOMContentLoaded',function(){
+    onPeerReady(function(){bootMobile(_conn)});
+    setTimeout(function(){
+      if(!_peerLoaded){
+        var app=document.getElementById('app');
+        if(app)app.innerHTML='<div style="padding:40px;text-align:center;color:red;font-size:16px">❌ PeerJS 로드 실패<br><br><small style="color:#666">인터넷 연결을 확인하고<br>페이지를 새로고침 해보세요</small><br><br><button onclick="location.reload()" style="padding:10px 20px;font-size:14px;border-radius:8px;border:none;background:#2c2825;color:white;cursor:pointer">🔄 새로고침</button></div>';
+      }
+    },10000);
+  });
 }else{
-  // PC: paste listener
+  // PC or standalone mobile: paste listener
   window.addEventListener('paste',function(e){
     if(S.view!=='upload'||S.loading)return;
     var fs=[];var items=e.clipboardData?e.clipboardData.items:[];
@@ -163,78 +180,152 @@ if(_conn){
 }
 
 /*========================================
-  MOBILE SENDER PAGE
+  MOBILE SENDER PAGE (QR로 접속 시)
 ========================================*/
 function bootMobile(targetId){
   var app=document.getElementById('app');
+  var logs=[];
+
+  function addLog(msg){
+    logs.push('['+new Date().toLocaleTimeString()+'] '+msg);
+    var logEl=document.getElementById('mlog');
+    if(logEl){logEl.textContent=logs.join('\n');logEl.scrollTop=logEl.scrollHeight}
+  }
+
   app.innerHTML='<div class="mobp"><div class="mobc">'+
     '<div style="font-size:42px;margin-bottom:8px">📸</div>'+
     '<h2>사진 전송</h2><p>촬영하면 PC로 바로 전송됩니다</p>'+
     '<input type="file" id="mc" accept="image/*" capture="environment" style="display:none">'+
     '<input type="file" id="mg" accept="image/*,application/pdf" multiple style="display:none">'+
-    '<button class="mbtn cam" onclick="document.getElementById(\'mc\').click()">📷 카메라 촬영</button>'+
-    '<button class="mbtn gal" onclick="document.getElementById(\'mg\').click()">🖼️ 앨범 선택</button>'+
-    '<div id="ms" class="mst w">🔗 연결 중...</div><div id="mp"></div>'+
+    '<button class="mbtn cam" id="camBtn">📷 카메라 촬영</button>'+
+    '<button class="mbtn gal" id="galBtn">🖼️ 앨범 선택</button>'+
+    '<hr style="margin:12px 0;border:none;border-top:1px solid #eee">'+
+    '<button class="mbtn solo" id="soloBtn">📱 이 폰에서 직접 작업하기</button>'+
+    '<div style="font-size:10px;color:#999;margin-top:4px">PC 전송 없이 여기서 바로 학습지 만들기</div>'+
+    '<div id="ms" class="mst w">🔗 PC 연결 중...</div>'+
+    '<div id="mp"></div>'+
+    '<div id="mlog" class="mlog"></div>'+
   '</div></div>';
 
   function st(){return document.getElementById('ms')}
   var conn=null;
+  var peerReady=false;
 
-  // PeerJS가 로드되었는지 확인
-  if(typeof Peer==='undefined'){
-    st().className='mst e';
-    st().textContent='❌ PeerJS 로드 실패. 페이지를 새로고침 해보세요.';
-    return;
-  }
+  // Solo mode: redirect to main page without connect param
+  document.getElementById('soloBtn').onclick=function(){
+    location.href=location.href.split('?')[0];
+  };
 
+  // Camera button
+  document.getElementById('camBtn').onclick=function(){
+    addLog('카메라 버튼 클릭');
+    document.getElementById('mc').click();
+  };
+
+  // Gallery button
+  document.getElementById('galBtn').onclick=function(){
+    addLog('앨범 버튼 클릭');
+    document.getElementById('mg').click();
+  };
+
+  addLog('PeerJS 로드 확인: ✅');
+
+  addLog('Peer 생성 시도...');
   var p=new Peer();
-  p.on('open',function(){
+
+  p.on('open',function(myId){
+    addLog('내 Peer ID: '+myId);
+    addLog('PC('+targetId+')에 연결 시도...');
     conn=p.connect(targetId,{reliable:true});
+
     conn.on('open',function(){
+      peerReady=true;
       st().className='mst g';
       st().textContent='✅ PC 연결 완료! 사진을 찍으세요';
+      addLog('✅ PC 연결 성공!');
     });
+
+    conn.on('close',function(){
+      peerReady=false;
+      st().className='mst e';
+      st().textContent='⚠️ PC 연결 끊김. QR을 다시 스캔하세요.';
+      addLog('연결 닫힘');
+    });
+
     conn.on('error',function(e){
       st().className='mst e';
       st().textContent='❌ 연결 실패: '+(e.message||e.type||'unknown');
+      addLog('연결 에러: '+(e.message||e.type||JSON.stringify(e)));
     });
   });
+
   p.on('error',function(e){
     st().className='mst e';
     st().textContent='❌ 서버 연결 실패: '+(e.message||e.type);
+    addLog('Peer 에러: '+(e.message||e.type||JSON.stringify(e)));
+  });
+
+  p.on('disconnected',function(){
+    addLog('Peer 서버에서 연결 해제됨');
   });
 
   function send(file){
-    if(!conn||!conn.open){st().className='mst e';st().textContent='❌ 연결 끊김. QR을 다시 스캔하세요.';return}
+    addLog('send() 호출 - 파일: '+file.name+' ('+Math.round(file.size/1024)+'KB)');
+
+    if(!conn||!conn.open){
+      st().className='mst e';
+      st().textContent='❌ PC와 연결이 안 되어 있습니다. QR을 다시 스캔하세요.';
+      addLog('❌ 연결 없음 - conn:'+(conn?'있음':'null')+', open:'+(conn?conn.open:'N/A'));
+      return;
+    }
     st().className='mst s';st().textContent='📤 전송 중...';
     if(file.type.startsWith('image/')){
       document.getElementById('mp').innerHTML='<img src="'+URL.createObjectURL(file)+'" class="mimg">';
     }
     toB64(file).then(function(b64){
+      addLog('Base64 변환 완료 ('+Math.round(b64.length/1024)+'KB)');
       var CS=180000,tot=Math.ceil(b64.length/CS);
+      addLog('청크 수: '+tot);
       conn.send({t:'s',name:file.name,mime:file.type,tot:tot});
       var i=0;
       function next(){
         if(i>=tot){
           conn.send({t:'e'});
           st().className='mst d';st().textContent='✅ 전송 완료! 추가 전송도 가능합니다';
+          addLog('✅ 전송 완료');
           return;
         }
         conn.send({t:'c',i:i,d:b64.slice(i*CS,(i+1)*CS)});
         i++;
+        var pct=Math.round(i/tot*100);
+        st().textContent='📤 전송 중... '+pct+'%';
         setTimeout(next,30);
       }
       next();
     }).catch(function(e){
       st().className='mst e';st().textContent='❌ 파일 읽기 실패';
+      addLog('❌ 파일 읽기 실패: '+(e.message||e));
     });
   }
 
-  document.getElementById('mc').onchange=function(e){if(e.target.files[0])send(e.target.files[0])};
-  document.getElementById('mg').onchange=function(e){
+  // File input handlers - use addEventListener for better mobile compatibility
+  document.getElementById('mc').addEventListener('change',function(e){
+    addLog('카메라 change 이벤트 발생, files: '+(e.target.files?e.target.files.length:0));
+    if(e.target.files&&e.target.files[0]){
+      send(e.target.files[0]);
+    }
+    // Reset so same file can be selected again
+    e.target.value='';
+  });
+
+  document.getElementById('mg').addEventListener('change',function(e){
+    addLog('앨범 change 이벤트 발생, files: '+(e.target.files?e.target.files.length:0));
     var files=e.target.files;
-    for(var i=0;i<files.length;i++)send(files[i]);
-  };
+    if(files){
+      for(var i=0;i<files.length;i++)send(files[i]);
+    }
+    e.target.value='';
+  });
 }
 
 /*========================================
@@ -243,7 +334,18 @@ function bootMobile(targetId){
 function initPeer(){
   return new Promise(function(ok,no){
     if(_peer&&_peer.id){ok(_peer.id);return}
+    if(!_peerLoaded){
+      onPeerReady(function(){
+        if(typeof Peer==='undefined'){no(new Error('PeerJS 로드 실패. 새로고침 해보세요.'));return}
+        _doInitPeer(ok,no);
+      });
+      return;
+    }
     if(typeof Peer==='undefined'){no(new Error('PeerJS가 로드되지 않았습니다. 인터넷 연결을 확인하세요.'));return}
+    _doInitPeer(ok,no);
+  });
+}
+function _doInitPeer(ok,no){
     _peer=new Peer();
     _peer.on('open',function(id){S.peerId=id;ok(id)});
     _peer.on('error',function(e){no(new Error(e.type||e.message||'Peer 오류'))});
@@ -265,7 +367,6 @@ function initPeer(){
         }
       });
     });
-  });
 }
 
 function openQR(){
@@ -306,7 +407,6 @@ function doExtract(files){
   upd({loading:true,error:null});
 
   var parts=[];
-  var pending=files.length;
   var idx=0;
 
   function next(){
@@ -453,9 +553,13 @@ function draw(){
 
 /*-- Upload --*/
 function drawUpload(el){
+  var mob=isMobile();
   var h='<div class="upload-box">';
   h+='<div class="drop" id="dz">';
   h+='<input type="file" id="fi" accept="image/*,application/pdf" multiple style="display:none">';
+  if(mob){
+    h+='<input type="file" id="fi-cam" accept="image/*" capture="environment" style="display:none">';
+  }
   if(S.loading){
     h+='<div style="font-size:38px;margin-bottom:8px"><span class="spin">⏳</span></div>';
     h+='<h2>단어 추출 중...</h2><p>AI 분석 중입니다</p>';
@@ -464,9 +568,14 @@ function drawUpload(el){
     h+='<h2>어휘 교재 페이지를 업로드하세요</h2>';
     h+='<p>PDF 또는 사진을 올리면 자동으로 학습지를 만듭니다</p>';
     h+='<div class="methods">';
-    h+='<div class="meth"><div class="mi">📁</div><div class="ml">파일 선택</div></div>';
-    h+='<div class="meth"><div class="mi">📋</div><div class="ml">Ctrl+V</div><div class="md">붙여넣기</div></div>';
-    h+='<div class="meth blue" id="qr-btn"><div class="mi">📱</div><div class="ml" style="color:#2a6ad4">핸드폰 촬영</div><div class="md" style="color:#5a8acc">QR → PC 전송</div></div>';
+    if(mob){
+      h+='<div class="meth blue" id="cam-btn"><div class="mi">📷</div><div class="ml" style="color:#2a6ad4">카메라 촬영</div></div>';
+      h+='<div class="meth"><div class="mi">📁</div><div class="ml">파일 선택</div></div>';
+    }else{
+      h+='<div class="meth"><div class="mi">📁</div><div class="ml">파일 선택</div></div>';
+      h+='<div class="meth"><div class="mi">📋</div><div class="ml">Ctrl+V</div><div class="md">붙여넣기</div></div>';
+      h+='<div class="meth blue" id="qr-btn"><div class="mi">📱</div><div class="ml" style="color:#2a6ad4">핸드폰 촬영</div><div class="md" style="color:#5a8acc">QR → PC 전송</div></div>';
+    }
     h+='</div>';
   }
   h+='</div>';
@@ -480,13 +589,27 @@ function drawUpload(el){
   var dz=document.getElementById('dz');
   var fi=document.getElementById('fi');
   var qb=document.getElementById('qr-btn');
+  var cb=document.getElementById('cam-btn');
+  var ficam=document.getElementById('fi-cam');
 
-  dz.onclick=function(e){if(!e.target.closest('#qr-btn')&&!S.loading)fi.click()};
-  fi.onchange=function(e){handleFiles(e.target.files)};
+  dz.onclick=function(e){
+    if(e.target.closest('#qr-btn')||e.target.closest('#cam-btn'))return;
+    if(!S.loading)fi.click();
+  };
+  fi.addEventListener('change',function(e){handleFiles(e.target.files);e.target.value='';});
+
+  if(ficam){
+    ficam.addEventListener('change',function(e){
+      if(e.target.files&&e.target.files[0])handleFiles(e.target.files);
+      e.target.value='';
+    });
+  }
+
   dz.ondragover=function(e){e.preventDefault();dz.classList.add('over')};
   dz.ondragleave=function(){dz.classList.remove('over')};
   dz.ondrop=function(e){e.preventDefault();dz.classList.remove('over');handleFiles(e.dataTransfer.files)};
   if(qb)qb.onclick=function(e){e.stopPropagation();openQR()};
+  if(cb)cb.onclick=function(e){e.stopPropagation();if(ficam)ficam.click()};
 }
 
 /*-- Edit --*/
@@ -583,21 +706,41 @@ function drawPreview(el){
 
 <!-- CDN: 동적 로드 - 실패해도 앱 안 깨짐 -->
 <script>
-// QRCode.js 로드
+// QRCode.js 로드 - 여러 CDN 순차 시도
 (function(){
-  var s=document.createElement('script');
-  s.src='https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
-  s.onload=function(){console.log('✅ QRCode.js loaded')};
-  s.onerror=function(){console.warn('⚠️ QRCode.js 로드 실패 - QR 기능 제한')};
-  document.head.appendChild(s);
+  var urls=[
+    'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+    'https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js'
+  ];
+  var i=0;
+  function tryNext(){
+    if(i>=urls.length){console.warn('⚠️ 모든 QRCode CDN 실패');return}
+    var s=document.createElement('script');
+    s.src=urls[i];i++;
+    s.onload=function(){console.log('✅ QRCode.js loaded from '+s.src)};
+    s.onerror=function(){console.warn('❌ QRCode 실패: '+s.src);tryNext()};
+    document.head.appendChild(s);
+  }
+  tryNext();
 })();
-// PeerJS 로드
+// PeerJS 로드 - 여러 CDN 순차 시도
 (function(){
-  var s=document.createElement('script');
-  s.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
-  s.onload=function(){console.log('✅ PeerJS loaded')};
-  s.onerror=function(){console.warn('⚠️ PeerJS 로드 실패 - 핸드폰 전송 기능 제한')};
-  document.head.appendChild(s);
+  var urls=[
+    'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js',
+    'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js'
+  ];
+  var i=0;
+  function tryNext(){
+    if(i>=urls.length){console.warn('⚠️ 모든 PeerJS CDN 실패');return}
+    var s=document.createElement('script');
+    s.src=urls[i];i++;
+    s.onload=function(){console.log('✅ PeerJS loaded from '+s.src);if(typeof _peerDone==='function')_peerDone()};
+    s.onerror=function(){console.warn('❌ PeerJS 실패: '+s.src);tryNext()};
+    document.head.appendChild(s);
+  }
+  tryNext();
 })();
 </script>
 </body>
