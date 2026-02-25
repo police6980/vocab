@@ -103,6 +103,14 @@ body{font-family:-apple-system,'Malgun Gothic','Noto Sans KR',sans-serif;backgro
 .mlog{margin-top:8px;padding:8px;background:#f8f8f8;border-radius:6px;font-size:10px;color:#888;text-align:left;max-height:120px;overflow-y:auto;font-family:monospace}
 
 .footer{text-align:center;padding:20px 0 8px;font-size:9px;color:#c0b8a8;letter-spacing:2px}
+
+/* Phrase word picker */
+.pw-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:3px;padding:2px 0}
+.pw{display:inline-block;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:12px;border:1.5px solid transparent;transition:all .12s;user-select:none}
+.pw:hover{background:#f0ece6;border-color:var(--bdr)}
+.pw-sel{background:var(--acc);color:white;font-weight:700;border-color:var(--acc)}
+.pw-sel:hover{background:#b8994e}
+
 @keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin .8s linear infinite;display:inline-block}
 @media print{
   body{background:#fff!important}.no-print{display:none!important}
@@ -120,12 +128,12 @@ body{font-family:-apple-system,'Malgun Gothic','Noto Sans KR',sans-serif;backgro
   DEMO DATA (오프라인 테스트용)
 ========================================*/
 var DEMO=[
-  {id:1,word:"shaded",phrase:"shaded terrace",pos:"a",def:"darker and cooler because something blocks direct light from the sun",kor:"그늘진",synonym:""},
-  {id:2,word:"unattractive",phrase:"unattractive offer",pos:"a",def:"not pleasant; lacking good or positive features",kor:"매력 없는",synonym:"ugly"},
-  {id:3,word:"admire",phrase:"admire a new car",pos:"v",def:"to feel respect or approval for someone or something",kor:"감탄하다",synonym:""},
-  {id:4,word:"darken",phrase:"darken the room",pos:"v",def:"to become dark or darker",kor:"어둡게하다",synonym:""},
-  {id:5,word:"relief",phrase:"sigh of relief",pos:"n",def:"a pleasant and relaxed feeling when something unpleasant stops",kor:"안도",synonym:""},
-  {id:6,word:"paradise",phrase:"earthly paradise",pos:"n",def:"a place of great happiness where everything seems perfect",kor:"낙원",synonym:"heaven"},
+  {id:1,word:"shaded",blank:"shaded",phrase:"shaded terrace",pos:"a",def:"darker and cooler because something blocks direct light from the sun",kor:"그늘진",synonym:""},
+  {id:2,word:"unattractive",blank:"unattractive",phrase:"unattractive offer",pos:"a",def:"not pleasant; lacking good or positive features",kor:"매력 없는",synonym:"ugly"},
+  {id:3,word:"admire",blank:"admire",phrase:"admire a new car",pos:"v",def:"to feel respect or approval for someone or something",kor:"감탄하다",synonym:""},
+  {id:4,word:"darken",blank:"darken",phrase:"darken the room",pos:"v",def:"to become dark or darker",kor:"어둡게하다",synonym:""},
+  {id:5,word:"relief",blank:"relief",phrase:"sigh of relief",pos:"n",def:"a pleasant and relaxed feeling when something unpleasant stops",kor:"안도",synonym:""},
+  {id:6,word:"paradise",blank:"paradise",phrase:"earthly paradise",pos:"n",def:"a place of great happiness where everything seems perfect",kor:"낙원",synonym:"heaven"},
 ];
 
 /*========================================
@@ -502,7 +510,7 @@ function callAPI(parts){
       for(var i=0;i<arr.length;i++){
         var x=arr[i];
         if(x._title){title=x._title+' - Vocabulary Worksheet';continue}
-        if(x.word){words.push({id:id++,word:x.word,phrase:x.phrase||'',pos:x.pos||'n',def:x.def||'',kor:x.kor||'',synonym:x.synonym||''})}
+        if(x.word){words.push({id:id++,word:x.word,blank:x.word,phrase:x.phrase||'',pos:x.pos||'n',def:x.def||'',kor:x.kor||'',synonym:x.synonym||''})}
       }
       if(!words.length)throw new Error('추출된 단어가 없습니다');
       upd({title:title,words:words,view:'edit',loading:false,error:null});
@@ -536,7 +544,7 @@ function doShuf(){S.words=shuffle(S.words);S.shuffled=true;draw()}
 function resetOrd(){S.words.sort(function(a,b){return a.id-b.id});S.shuffled=false;draw()}
 function addW(){
   var n=1;for(var i=0;i<S.words.length;i++){if(S.words[i].id>=n)n=S.words[i].id+1}
-  S.words.push({id:n,word:'',phrase:'',pos:'n',def:'',kor:'',synonym:''});draw();
+  S.words.push({id:n,word:'',blank:'',phrase:'',pos:'n',def:'',kor:'',synonym:''});draw();
 }
 function delW(id){S.words=S.words.filter(function(w){return w.id!==id});draw()}
 function loadDemo(){S.words=DEMO.slice();S.title='LESSON 11 - Vocabulary Worksheet';S.view='edit';draw()}
@@ -706,8 +714,10 @@ function drawEdit(el){
   h+='<span style="flex:1"></span>';
   h+='<button class="b b-dk" onclick="upd({view:\'preview\'})">👁 미리보기 →</button>';
   h+='</div>';
+  h+='<div style="background:#faf6ee;border:1px solid var(--bdr);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#6a6560">';
+  h+='💡 <b>표현</b> 열에서 단어를 클릭하면 빈칸 대상이 변경됩니다. <span style="background:#c8a96e;color:white;padding:1px 6px;border-radius:3px;font-size:11px">빈칸 대상</span> 표시된 단어가 시험지에서 빈칸이 됩니다.</div>';
   h+='<div class="ecard"><div style="overflow-x:auto"><table class="et"><thead><tr>';
-  h+='<th style="width:28px">#</th><th>단어</th><th>표현</th><th style="width:32px">품사</th><th>영영풀이</th><th>한국어</th><th>유의어</th><th style="width:24px"></th>';
+  h+='<th style="width:28px">#</th><th>단어</th><th>표현 <span style="font-weight:400;font-size:10px;color:var(--mut)">(클릭으로 빈칸 선택)</span></th><th style="width:32px">품사</th><th>영영풀이</th><th>한국어</th><th>유의어</th><th style="width:24px"></th>';
   h+='</tr></thead><tbody id="eb"></tbody></table></div>';
   h+='<div class="add-r"><button class="b b-lt" style="width:100%;justify-content:center;border-style:dashed" onclick="addW()">+ 단어 추가</button></div>';
   h+='<div style="padding:3px 12px 8px;text-align:right;font-size:11px;color:var(--mut)">총 '+w.length+'개</div></div>';
@@ -718,15 +728,59 @@ function drawEdit(el){
   for(var i=0;i<w.length;i++){
     (function(ww,idx){
       var tr=document.createElement('tr');
+
+      // Build phrase cell with clickable words
+      var phraseWords=(ww.phrase||'').split(/\s+/).filter(function(x){return x});
+      var phraseHtml='<div class="pw-wrap">';
+      for(var p=0;p<phraseWords.length;p++){
+        var pw=phraseWords[p];
+        var isBlank=pw.toLowerCase()===((ww.blank||'').toLowerCase());
+        phraseHtml+='<span class="pw'+(isBlank?' pw-sel':'')+'" data-word="'+esc(pw)+'" data-id="'+ww.id+'">'+esc(pw)+'</span> ';
+      }
+      // Custom blank input
+      phraseHtml+='<input class="pw-custom" data-id="'+ww.id+'" placeholder="직접 입력..." value="'+(phraseWords.map(function(x){return x.toLowerCase()}).indexOf((ww.blank||'').toLowerCase())<0?esc(ww.blank):'')+'" style="width:80px;font-size:11px;border:1px dashed var(--bdr);border-radius:3px;padding:2px 4px;margin-left:4px;'+(phraseWords.map(function(x){return x.toLowerCase()}).indexOf((ww.blank||'').toLowerCase())<0&&ww.blank?'border-color:var(--acc);background:#faf6ee':'opacity:0.5')+'">';
+      phraseHtml+='</div>';
+
       tr.innerHTML='<td style="text-align:center;color:var(--mut);font-size:11px">'+(idx+1)+'</td>'+
         '<td><input class="bld" data-id="'+ww.id+'" data-f="word" value="'+esc(ww.word)+'"></td>'+
-        '<td><input data-id="'+ww.id+'" data-f="phrase" value="'+esc(ww.phrase)+'"></td>'+
+        '<td>'+phraseHtml+'</td>'+
         '<td><select data-id="'+ww.id+'" data-f="pos">'+['n','v','a','p','ad'].map(function(p){return'<option'+(ww.pos===p?' selected':'')+'>'+p+'</option>'}).join('')+'</select></td>'+
         '<td><input class="sml" data-id="'+ww.id+'" data-f="def" value="'+esc(ww.def)+'"></td>'+
         '<td><input data-id="'+ww.id+'" data-f="kor" value="'+esc(ww.kor)+'"></td>'+
         '<td><input class="ita" data-id="'+ww.id+'" data-f="synonym" value="'+esc(ww.synonym)+'"></td>'+
         '<td><button class="xb" onclick="delW('+ww.id+')">×</button></td>';
-      var inputs=tr.querySelectorAll('input,select');
+
+      // Clickable phrase words
+      var pws=tr.querySelectorAll('.pw');
+      for(var j=0;j<pws.length;j++){
+        pws[j].onclick=function(e){
+          var id=parseInt(e.target.getAttribute('data-id'));
+          var clicked=e.target.getAttribute('data-word');
+          for(var k=0;k<S.words.length;k++){
+            if(S.words[k].id===id){S.words[k].blank=clicked;break}
+          }
+          draw();
+        };
+      }
+
+      // Custom blank input
+      var customInput=tr.querySelector('.pw-custom');
+      if(customInput){
+        customInput.oninput=function(e){
+          var id=parseInt(e.target.getAttribute('data-id'));
+          var val=e.target.value.trim();
+          if(val){
+            for(var k=0;k<S.words.length;k++){
+              if(S.words[k].id===id){S.words[k].blank=val;break}
+            }
+          }
+        };
+        customInput.onblur=function(e){
+          if(e.target.value.trim())draw();
+        };
+      }
+
+      var inputs=tr.querySelectorAll('input[data-f],select[data-f]');
       for(var j=0;j<inputs.length;j++){
         inputs[j].oninput=function(e){
           var id=parseInt(e.target.getAttribute('data-id'));
@@ -747,17 +801,23 @@ function drawPreview(el){
   var rows='';
   for(var i=0;i<w.length;i++){
     var ww=w[i];
-    var bw=Math.max(150,(ww.word||'').length*13);
+    var blankWord=ww.blank||ww.word;
+    var bw=Math.max(150,(blankWord||'').length*13);
     var ex;
     if(bl.word){
-      if(ww.phrase&&ww.word&&ww.phrase.indexOf(ww.word)>=0){
-        var idx=ww.phrase.indexOf(ww.word);
-        ex=esc(ww.phrase.slice(0,idx))+'<span class="bl" style="width:'+bw+'px">&nbsp;</span>'+esc(ww.phrase.slice(idx+ww.word.length));
+      if(ww.phrase&&blankWord&&ww.phrase.toLowerCase().indexOf(blankWord.toLowerCase())>=0){
+        var idx=ww.phrase.toLowerCase().indexOf(blankWord.toLowerCase());
+        ex=esc(ww.phrase.slice(0,idx))+'<span class="bl" style="width:'+bw+'px">&nbsp;</span>'+esc(ww.phrase.slice(idx+blankWord.length));
       }else{
         ex='<span class="bl" style="width:'+bw+'px">&nbsp;</span> '+esc(ww.phrase);
       }
     }else{
-      ex='<b>'+esc(ww.word)+'</b> '+esc((ww.phrase||'').replace(ww.word,'').trim());
+      if(ww.phrase&&blankWord&&ww.phrase.toLowerCase().indexOf(blankWord.toLowerCase())>=0){
+        var idx=ww.phrase.toLowerCase().indexOf(blankWord.toLowerCase());
+        ex=esc(ww.phrase.slice(0,idx))+'<b>'+esc(ww.phrase.slice(idx,idx+blankWord.length))+'</b>'+esc(ww.phrase.slice(idx+blankWord.length));
+      }else{
+        ex='<b>'+esc(blankWord)+'</b> '+esc((ww.phrase||''));
+      }
     }
     var df=bl.def?'<span class="bl" style="width:92%">&nbsp;</span>':esc(ww.def);
     var kr=bl.kor?'<span class="bl" style="width:110px">&nbsp;</span>':esc(ww.kor);
