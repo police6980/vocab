@@ -135,7 +135,8 @@ var S={
   view:'upload', words:[], title:'Vocabulary Worksheet',
   blanks:{word:true,kor:true,def:false},
   loading:false, error:null, shuffled:false,
-  qrOpen:false, peerSt:'idle', peerId:null
+  qrOpen:false, peerSt:'idle', peerId:null,
+  apiKey:localStorage.getItem('vocabApiKey')||''
 };
 var _peer=null;
 
@@ -435,9 +436,19 @@ function callAPI(parts){
     '모든 단어 빠짐없이 추출하세요.'
   });
 
-  fetch('https://api.anthropic.com/v1/messages',{
+  if(!S.apiKey){
+    upd({loading:false,error:'❌ API 키를 먼저 입력하세요 (상단 🔑 버튼)'});
+    return;
+  }
+
+  var apiUrl='https://corsproxy.io/?url=https://api.anthropic.com/v1/messages';
+  fetch(apiUrl,{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':S.apiKey,
+      'anthropic-version':'2023-06-01'
+    },
     body:JSON.stringify({
       model:'claude-sonnet-4-20250514',
       max_tokens:8192,
@@ -516,6 +527,35 @@ function doPrint(){
 }
 
 /*========================================
+  API KEY MODAL
+========================================*/
+function openApiKeyModal(){
+  var existing=document.getElementById('apikey-modal');
+  if(existing){existing.remove();return}
+  var d=document.createElement('div');
+  d.id='apikey-modal';
+  d.className='ov';
+  d.onclick=function(e){if(e.target===d)d.remove()};
+  d.innerHTML='<div class="mdl" style="max-width:420px">'+
+    '<h3>🔑 Claude API 키 설정</h3>'+
+    '<div class="ds" style="margin-bottom:12px">사진에서 단어를 자동 추출하려면 API 키가 필요합니다.<br><a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--acc)">console.anthropic.com</a>에서 발급받으세요.</div>'+
+    '<input type="password" id="api-key-input" value="'+(S.apiKey||'')+'" placeholder="sk-ant-..." style="width:100%;padding:10px;border:1px solid var(--bdr);border-radius:6px;font-size:14px;font-family:monospace;box-sizing:border-box">'+
+    '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">'+
+    '<button class="b b-lt" onclick="document.getElementById(\'apikey-modal\').remove()">취소</button>'+
+    '<button class="b b-gd" onclick="saveApiKey()">저장</button>'+
+    '</div></div>';
+  document.body.appendChild(d);
+  document.getElementById('api-key-input').focus();
+}
+function saveApiKey(){
+  var v=document.getElementById('api-key-input').value.trim();
+  S.apiKey=v;
+  try{localStorage.setItem('vocabApiKey',v)}catch(e){}
+  document.getElementById('apikey-modal').remove();
+  draw();
+}
+
+/*========================================
   DRAW
 ========================================*/
 function draw(){
@@ -524,9 +564,10 @@ function draw(){
   var h='';
 
   // Header
-  h+='<div class="hdr no-print"><div><h1>VOCAB WORKSHEET</h1><small>어휘 학습지 자동 생성</small></div>';
+  h+='<div class="hdr no-print"><div><h1>VOCAB WORKSHEET</h1><small>어휘 학습지 자동 생성</small></div><div style="display:flex;gap:8px;align-items:center">';
+  h+='<button class="b b-lt" onclick="openApiKeyModal()" title="API 키 설정" style="font-size:15px;padding:5px 10px;background:transparent;color:#a09888;border:1px solid #555">'+(S.apiKey?'🔑':'🔒')+'</button>';
   if(S.view!=='upload')h+='<button class="b b-lt" onclick="upd({view:\'upload\',words:[],error:null,shuffled:false})">← 새 파일</button>';
-  h+='</div><div class="wrap" id="main"></div><div class="footer no-print">VOCAB WORKSHEET MAKER</div>';
+  h+='</div></div><div class="wrap" id="main"></div><div class="footer no-print">VOCAB WORKSHEET MAKER</div>';
 
   // QR Modal
   if(S.qrOpen){
