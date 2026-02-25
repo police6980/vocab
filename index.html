@@ -128,12 +128,26 @@ body{font-family:-apple-system,'Malgun Gothic','Noto Sans KR',sans-serif;backgro
   DEMO DATA (오프라인 테스트용)
 ========================================*/
 var DEMO=[
-  {id:1,word:"shaded",blank:"shaded",phrase:"shaded terrace",pos:"a",def:"darker and cooler because something blocks direct light from the sun",kor:"그늘진",synonym:""},
-  {id:2,word:"unattractive",blank:"unattractive",phrase:"unattractive offer",pos:"a",def:"not pleasant; lacking good or positive features",kor:"매력 없는",synonym:"ugly"},
-  {id:3,word:"admire",blank:"admire",phrase:"admire a new car",pos:"v",def:"to feel respect or approval for someone or something",kor:"감탄하다",synonym:""},
-  {id:4,word:"darken",blank:"darken",phrase:"darken the room",pos:"v",def:"to become dark or darker",kor:"어둡게하다",synonym:""},
-  {id:5,word:"relief",blank:"relief",phrase:"sigh of relief",pos:"n",def:"a pleasant and relaxed feeling when something unpleasant stops",kor:"안도",synonym:""},
-  {id:6,word:"paradise",blank:"paradise",phrase:"earthly paradise",pos:"n",def:"a place of great happiness where everything seems perfect",kor:"낙원",synonym:"heaven"},
+  {id:21,word:"district",blank:"district",phrase:"business district",pos:"n",def:"an area of a country or town that has particular features",kor:"지구",synonym:"area"},
+  {id:22,word:"property",blank:"property",phrase:"intellectual property",pos:"n",def:"a thing or things that are owned by somebody",kor:"재산",synonym:"possession"},
+  {id:23,word:"information",blank:"information",phrase:"accurate information",pos:"a",def:"correct or true in every detail",kor:"정확한",synonym:"correct"},
+  {id:24,word:"plague",blank:"plague",phrase:"plague outbreak",pos:"n",def:"a disease that spreads quickly and kills many people",kor:"전염병",synonym:"epidemic"},
+  {id:25,word:"germs",blank:"germs",phrase:"spread germs",pos:"n",def:"very small living things that can cause infection and disease",kor:"세균",synonym:"bacteria"},
+  {id:26,word:"cramped",blank:"cramped",phrase:"cramped kitchen",pos:"a",def:"not having enough space",kor:"비좁은",synonym:"tight"},
+  {id:27,word:"rage",blank:"rage",phrase:"forest fires rage",pos:"v",def:"(of an illness, a fire, etc.) to spread very quickly",kor:"급속히 번지다",synonym:""},
+  {id:28,word:"attractive",blank:"attractive",phrase:"attractive woman",pos:"a",def:"very pleasing in appearance or sound",kor:"매력적인",synonym:"charming"},
+  {id:29,word:"measure",blank:"measure",phrase:"safety measure",pos:"n",def:"a way of achieving something, or a method for dealing with a situation",kor:"조치",synonym:"action"},
+  {id:30,word:"obvious",blank:"obvious",phrase:"obvious choice",pos:"a",def:"easy to see or notice",kor:"당연한",synonym:"clear"},
+  {id:31,word:"opposite",blank:"opposite",phrase:"opposite direction",pos:"a",def:"located at the other end, side, or corner of something",kor:"반대의",synonym:"reverse"},
+  {id:32,word:"triumph",blank:"triumph",phrase:"triumph over evil",pos:"v",def:"to achieve victory, especially in a long or difficult contest",kor:"승리하다",synonym:"win"},
+  {id:33,word:"thrill",blank:"thrill",phrase:"thrill of victory",pos:"n",def:"a feeling of great excitement or happiness",kor:"짜릿함",synonym:"excitement"},
+  {id:34,word:"Revolution",blank:"Revolution",phrase:"Industrial Revolution",pos:"n",def:"a sudden and great change; an attempt, by a large number of people, to change the government of a country, especially by violent action",kor:"혁명",synonym:""},
+  {id:35,word:"revolt",blank:"revolt",phrase:"revolt against the government",pos:"v",def:"to fight in a violent way against the rule of a leader or government",kor:"반란을 일으키다",synonym:"rebel"},
+  {id:36,word:"royalty",blank:"royalty",phrase:"king and royalty",pos:"n",def:"members of a royal family",kor:"왕족",synonym:""},
+  {id:37,word:"execution",blank:"execution",phrase:"public execution",pos:"n",def:"the act of killing somebody as a legal punishment",kor:"처형",synonym:""},
+  {id:38,word:"alternate",blank:"alternate",phrase:"alternate work and rest",pos:"v",def:"to place or do different things so that one follows the other in a repeated series",kor:"번갈아 하다",synonym:"take turns"},
+  {id:39,word:"intense",blank:"intense",phrase:"intense exercise",pos:"a",def:"very great in degree; very strong",kor:"격렬한",synonym:"extreme"},
+  {id:40,word:"moderate",blank:"moderate",phrase:"moderate exercise",pos:"a",def:"neither too much nor too little",kor:"적당한",synonym:"modest"},
 ];
 
 /*========================================
@@ -698,6 +712,64 @@ function drawUpload(el){
 }
 
 /*-- Edit --*/
+// Flush all input values to S.words before switching views
+function flushInputs(){
+  var inputs=document.querySelectorAll('#eb input[data-f],#eb select[data-f]');
+  for(var i=0;i<inputs.length;i++){
+    var id=parseInt(inputs[i].getAttribute('data-id'));
+    var f=inputs[i].getAttribute('data-f');
+    for(var k=0;k<S.words.length;k++){
+      if(S.words[k].id===id){
+        S.words[k][f]=inputs[i].value;
+        break;
+      }
+    }
+  }
+  var ti=document.getElementById('ti');
+  if(ti)S.title=ti.value;
+}
+
+function goPreview(){flushInputs();S.view='preview';draw()}
+function setBlank(id,val){
+  flushInputs();
+  for(var k=0;k<S.words.length;k++){
+    if(S.words[k].id===id){S.words[k].blank=val;S.words[k].word=val;break}
+  }
+  draw();
+}
+
+function editPhrase(id){
+  var wrap=document.getElementById('pw-'+id);
+  if(!wrap)return;
+  var curPhrase='';
+  for(var k=0;k<S.words.length;k++){if(S.words[k].id===id){curPhrase=S.words[k].phrase;break}}
+  wrap.innerHTML='<input class="pw-inp" value="'+curPhrase.replace(/"/g,'&quot;')+'" data-id="'+id+'" style="width:calc(100% - 60px);padding:4px 6px;font-size:12px;border:2px solid var(--acc);border-radius:4px;outline:none">'+
+    '<button onclick="confirmPhrase('+id+')" style="margin-left:4px;padding:3px 10px;font-size:11px;border:none;background:var(--acc);color:white;border-radius:4px;cursor:pointer;font-weight:600">확정</button>';
+  var inp=wrap.querySelector('.pw-inp');
+  if(inp){inp.focus();inp.select();inp.onkeydown=function(ev){if(ev.key==="Enter")confirmPhrase(id)};}
+}
+
+function confirmPhrase(id){
+  var inp=document.querySelector('.pw-inp[data-id="'+id+'"]');
+  if(!inp)return;
+  var newPhrase=inp.value.trim();
+  flushInputs();
+  for(var k=0;k<S.words.length;k++){
+    if(S.words[k].id===id){
+      S.words[k].phrase=newPhrase;
+      var newWords=newPhrase.split(/\s+/).filter(function(x){return x});
+      var found=false;
+      for(var n=0;n<newWords.length;n++){
+        if(newWords[n].toLowerCase()===S.words[k].blank.toLowerCase()){found=true;break}
+      }
+      if(!found&&newWords.length>0)S.words[k].blank=newWords[0];
+      S.words[k].word=S.words[k].blank;
+      break;
+    }
+  }
+  draw();
+}
+
 function drawEdit(el){
   var w=S.words,bl=S.blanks,sh=S.shuffled;
   var h='';
@@ -709,15 +781,15 @@ function drawEdit(el){
   h+='<button class="b '+(bl.kor?'b-on':'b-off')+'" onclick="toggleB(\'kor\')">'+(bl.kor?'☑':'☐')+' 한국어</button>';
   h+='<button class="b '+(bl.def?'b-on':'b-off')+'" onclick="toggleB(\'def\')">'+(bl.def?'☑':'☐')+' 영영풀이</button>';
   h+='<span class="sep"></span>';
-  h+='<button class="b b-gd" onclick="doShuf()">🔀 셔플</button>';
-  if(sh)h+='<button class="b b-lt" onclick="resetOrd()">↩ 원래순서</button>';
+  h+='<button class="b b-gd" onclick="flushInputs();doShuf()">🔀 셔플</button>';
+  if(sh)h+='<button class="b b-lt" onclick="flushInputs();resetOrd()">↩ 원래순서</button>';
   h+='<span style="flex:1"></span>';
-  h+='<button class="b b-dk" onclick="upd({view:\'preview\'})">👁 미리보기 →</button>';
+  h+='<button class="b b-dk" onclick="goPreview()">👁 미리보기 →</button>';
   h+='</div>';
   h+='<div style="background:#faf6ee;border:1px solid var(--bdr);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#6a6560">';
-  h+='💡 <b>표현</b> 열에서 단어를 클릭하면 빈칸 대상이 변경됩니다. <span style="background:#c8a96e;color:white;padding:1px 6px;border-radius:3px;font-size:11px">빈칸 대상</span> 표시된 단어가 시험지에서 빈칸이 됩니다.</div>';
+  h+='💡 <b>표현</b> 열: 단어 클릭→빈칸 선택(금색), ✏️→표현 수정 후 확정</div>';
   h+='<div class="ecard"><div style="overflow-x:auto"><table class="et"><thead><tr>';
-  h+='<th style="width:28px">#</th><th>단어</th><th>표현 <span style="font-weight:400;font-size:10px;color:var(--mut)">(클릭으로 빈칸 선택)</span></th><th style="width:32px">품사</th><th>영영풀이</th><th>한국어</th><th>유의어</th><th style="width:24px"></th>';
+  h+='<th style="width:28px">#</th><th style="min-width:80px">빈칸 단어</th><th>표현 <span style="font-weight:400;font-size:10px;color:var(--mut)">(클릭→빈칸, ✏️→수정)</span></th><th style="width:32px">품사</th><th>영영풀이</th><th>한국어</th><th>유의어</th><th style="width:24px"></th>';
   h+='</tr></thead><tbody id="eb"></tbody></table></div>';
   h+='<div class="add-r"><button class="b b-lt" style="width:100%;justify-content:center;border-style:dashed" onclick="addW()">+ 단어 추가</button></div>';
   h+='<div style="padding:3px 12px 8px;text-align:right;font-size:11px;color:var(--mut)">총 '+w.length+'개</div></div>';
@@ -728,61 +800,24 @@ function drawEdit(el){
   for(var i=0;i<w.length;i++){
     (function(ww,idx){
       var tr=document.createElement('tr');
-
-      // Build phrase cell with clickable words
       var phraseWords=(ww.phrase||'').split(/\s+/).filter(function(x){return x});
-      var phraseHtml='<div class="pw-wrap">';
+      var phraseHtml='<div class="pw-wrap" id="pw-'+ww.id+'">';
       for(var p=0;p<phraseWords.length;p++){
         var pw=phraseWords[p];
         var isBlank=pw.toLowerCase()===((ww.blank||'').toLowerCase());
-        phraseHtml+='<span class="pw'+(isBlank?' pw-sel':'')+'" data-word="'+esc(pw)+'" data-id="'+ww.id+'">'+esc(pw)+'</span> ';
+        phraseHtml+='<span class="pw'+(isBlank?' pw-sel':'')+'" onclick="setBlank('+ww.id+',\''+pw.replace(/'/g,"\'")+'\')" title="클릭→빈칸 대상">'+esc(pw)+'</span> ';
       }
-      // Custom blank input
-      phraseHtml+='<input class="pw-custom" data-id="'+ww.id+'" placeholder="직접 입력..." value="'+(phraseWords.map(function(x){return x.toLowerCase()}).indexOf((ww.blank||'').toLowerCase())<0?esc(ww.blank):'')+'" style="width:80px;font-size:11px;border:1px dashed var(--bdr);border-radius:3px;padding:2px 4px;margin-left:4px;'+(phraseWords.map(function(x){return x.toLowerCase()}).indexOf((ww.blank||'').toLowerCase())<0&&ww.blank?'border-color:var(--acc);background:#faf6ee':'opacity:0.5')+'">';
+      phraseHtml+='<span class="pw-edit" onclick="editPhrase('+ww.id+')" title="표현 수정">✏️</span>';
       phraseHtml+='</div>';
 
       tr.innerHTML='<td style="text-align:center;color:var(--mut);font-size:11px">'+(idx+1)+'</td>'+
-        '<td><input class="bld" data-id="'+ww.id+'" data-f="word" value="'+esc(ww.word)+'"></td>'+
+        '<td><input class="bld" data-id="'+ww.id+'" data-f="word" value="'+esc(ww.blank||ww.word)+'" style="font-weight:700"></td>'+
         '<td>'+phraseHtml+'</td>'+
         '<td><select data-id="'+ww.id+'" data-f="pos">'+['n','v','a','p','ad'].map(function(p){return'<option'+(ww.pos===p?' selected':'')+'>'+p+'</option>'}).join('')+'</select></td>'+
         '<td><input class="sml" data-id="'+ww.id+'" data-f="def" value="'+esc(ww.def)+'"></td>'+
         '<td><input data-id="'+ww.id+'" data-f="kor" value="'+esc(ww.kor)+'"></td>'+
         '<td><input class="ita" data-id="'+ww.id+'" data-f="synonym" value="'+esc(ww.synonym)+'"></td>'+
         '<td><button class="xb" onclick="delW('+ww.id+')">×</button></td>';
-
-      // Clickable phrase words
-      var pws=tr.querySelectorAll('.pw');
-      for(var j=0;j<pws.length;j++){
-        pws[j].onclick=function(e){
-          var id=parseInt(e.target.getAttribute('data-id'));
-          var clicked=e.target.getAttribute('data-word');
-          for(var k=0;k<S.words.length;k++){
-            if(S.words[k].id===id){
-              S.words[k].blank=clicked;
-              S.words[k].word=clicked;
-              break;
-            }
-          }
-          draw();
-        };
-      }
-
-      // Custom blank input
-      var customInput=tr.querySelector('.pw-custom');
-      if(customInput){
-        customInput.oninput=function(e){
-          var id=parseInt(e.target.getAttribute('data-id'));
-          var val=e.target.value.trim();
-          if(val){
-            for(var k=0;k<S.words.length;k++){
-              if(S.words[k].id===id){S.words[k].blank=val;break}
-            }
-          }
-        };
-        customInput.onblur=function(e){
-          if(e.target.value.trim())draw();
-        };
-      }
 
       var inputs=tr.querySelectorAll('input[data-f],select[data-f]');
       for(var j=0;j<inputs.length;j++){
