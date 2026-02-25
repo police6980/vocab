@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vocab Worksheet Maker</title>
+<style>
+:root{--bg:#f7f5f1;--card:#fff;--bdr:#ddd8d0;--txt:#2c2825;--mut:#8a8580;--acc:#c8a96e;--dk:#2c2825}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Malgun Gothic','Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+
+/* Header */
+.hdr{background:var(--dk);color:#f5f0e8;padding:14px 20px;border-bottom:3px solid var(--acc);display:flex;align-items:center;justify-content:space-between}
+.hdr h1{font-size:20px;letter-spacing:2px;font-weight:700}
+.hdr small{font-size:11px;color:#a09888;display:block;margin-top:2px}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 14px}
+
+/* Buttons */
+.b{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border:none;border-radius:5px;font-size:13px;font-weight:500;cursor:pointer;transition:all .12s;font-family:inherit}
+.b-dk{background:var(--dk);color:#f5f0e8}.b-dk:hover{background:#1a1815}
+.b-gd{background:var(--acc);color:var(--dk);font-weight:600}.b-gd:hover{background:#b8994e}
+.b-lt{background:#f0ece6;color:#4a4540;border:1px solid var(--bdr)}.b-lt:hover{background:#e8e3db}
+.b-on{background:var(--dk);color:#f5f0e8;border:1px solid var(--dk)}
+.b-off{background:#f0ece6;color:#4a4540;border:1px solid var(--bdr)}
+
+/* Upload */
+.upload-box{max-width:600px;margin:30px auto;text-align:center}
+.drop{border:2.5px dashed var(--bdr);border-radius:14px;padding:40px 20px;cursor:pointer;background:#fdfcfa;transition:all .15s}
+.drop:hover,.drop.over{border-color:var(--acc);background:#faf6ee}
+.drop h2{font-size:17px;margin:8px 0 4px}
+.drop p{font-size:13px;color:#6a6560}
+.methods{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.meth{padding:12px;border-radius:10px;background:#f8f6f2;border:1px solid #e8e4de;text-align:center;min-width:100px;flex:1}
+.meth.blue{border-color:#4a9eff;background:#f0f7ff;cursor:pointer}
+.meth .mi{font-size:22px;margin-bottom:3px}
+.meth .ml{font-size:11px;font-weight:600}
+.meth .md{font-size:9px;color:var(--mut);margin-top:1px}
+.err{margin-top:12px;padding:10px 14px;background:#fef2f2;border:1px solid #fcc;border-radius:6px;color:#900;font-size:12px;text-align:center}
+
+/* Toolbar */
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 12px;background:var(--card);border:1px solid var(--bdr);border-radius:6px;margin-bottom:12px}
+.toolbar .lbl{font-size:10px;color:var(--mut);letter-spacing:1px;margin-right:2px}
+.sep{width:1px;height:18px;background:var(--bdr);margin:0 3px}
+
+/* Edit Table */
+.ecard{background:var(--card);border:1px solid var(--bdr);border-radius:6px;overflow:hidden}
+.et{width:100%;border-collapse:collapse}
+.et th{padding:8px 5px;font-size:10px;color:var(--mut);font-weight:500;text-align:left;border-bottom:2px solid var(--bdr);white-space:nowrap}
+.et td{padding:6px 4px;border-bottom:1px solid #eee}
+.et input{width:100%;border:none;background:none;outline:none;font-size:12px;padding:3px 0;color:var(--txt)}
+.et input.bld{font-weight:700}
+.et input.ita{font-style:italic;color:var(--mut)}
+.et input.sml{font-size:11px}
+.et select{border:none;background:none;font-size:11px;color:var(--mut);cursor:pointer;outline:none}
+.xb{background:none;border:none;color:#ccc;font-size:16px;cursor:pointer;padding:0 2px}.xb:hover{color:#c44}
+.add-r{padding:10px;border-top:1px solid #eee}
+
+/* Preview */
+.pvw{background:var(--card);padding:24px;border:1px solid var(--bdr);border-radius:6px;max-width:960px;margin:0 auto}
+.pvt{text-align:center;margin-bottom:14px}
+.pvt h2{font-size:16px;font-weight:700}
+.pvt .nl{font-size:12px;color:#444;margin-top:8px}
+.pvt .ins{font-size:11px;color:#555;margin-top:4px}
+.pv{width:100%;border-collapse:collapse}
+.pv th{padding:6px 4px;font-size:10px;font-weight:700;text-align:center;border:1.5px solid #999;background:#f0f0f0}
+.pv td{border:1px solid #bbb;vertical-align:middle}
+.pv .cn{padding:6px 3px;text-align:center;color:#999;font-size:10px;width:24px}
+.pv .ce{padding:12px 5px;height:44px;font-size:12px}
+.pv .cp{padding:6px 3px;text-align:center;font-style:italic;color:#999;font-size:10px;width:24px}
+.pv .cd{padding:12px 5px;font-size:10px;line-height:1.5;height:44px}
+.pv .ck{padding:12px 5px;text-align:center;height:44px;font-size:12px;min-width:105px}
+.pv .cs{padding:6px 3px;text-align:center;font-style:italic;color:#999;font-size:10px;width:60px}
+.bl{display:inline-block;border-bottom:2.5px solid #333;min-height:26px;vertical-align:bottom}
+
+/* QR Modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;display:flex;align-items:center;justify-content:center}
+.mdl{background:#fff;border-radius:14px;padding:24px;text-align:center;max-width:380px;width:92%;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+.mdl h3{font-size:16px;margin-bottom:4px}
+.mdl .ds{font-size:12px;color:#666;margin-bottom:14px;line-height:1.5}
+#qr-box{display:inline-block;padding:8px;background:#fff;border-radius:6px;margin-bottom:10px;min-width:200px;min-height:200px}
+.sbdg{display:inline-block;padding:5px 12px;border-radius:16px;font-size:11px;font-weight:500}
+.sbdg.w{background:#fef9e7;color:#8a6d00}
+.sbdg.g{background:#e8f8e8;color:#2d7a2d}
+.ucopy{margin-top:8px;padding:7px 10px;background:#f5f3f0;border-radius:5px;font-size:9px;color:#888;word-break:break-all;cursor:pointer;border:1px solid #e8e4de}
+.ucopy:active{background:#e8f8e8}
+
+/* Mobile */
+.mobp{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#e8f0ff,#f0f7ff)}
+.mobc{background:#fff;border-radius:18px;padding:26px 20px;text-align:center;max-width:350px;width:100%;box-shadow:0 6px 24px rgba(0,0,0,.1)}
+.mobc h2{font-size:18px;margin-bottom:6px}
+.mobc p{font-size:13px;color:#666;margin-bottom:18px}
+.mbtn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:8px;font-family:inherit}
+.mbtn.cam{background:#4a9eff;color:#fff}
+.mbtn.gal{background:#f0f0f0;color:#333}
+.mst{margin-top:12px;padding:10px;border-radius:8px;font-size:13px}
+.mst.w{background:#fef9e7;color:#8a6d00}
+.mst.g{background:#e8f8e8;color:#2d7a2d}
+.mst.s{background:#e8f0ff;color:#2a5aaa}
+.mst.d{background:#e8f8e8;color:#2d7a2d}
+.mst.e{background:#fef2f2;color:#9b2c2c}
+.mimg{max-width:100%;max-height:160px;border-radius:6px;margin-top:8px}
+
+.footer{text-align:center;padding:20px 0 8px;font-size:9px;color:#c0b8a8;letter-spacing:2px}
+@keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin .8s linear infinite;display:inline-block}
+@media print{
+  body{background:#fff!important}.no-print{display:none!important}
+  .pvw{border:none;padding:0}
+  .pv .ce,.pv .cd,.pv .ck{height:48px;padding:14px 5px}
+  .bl{min-height:28px}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/*========================================
+  DEMO DATA (오프라인 테스트용)
+========================================*/
+var DEMO=[
+  {id:1,word:"shaded",phrase:"shaded terrace",pos:"a",def:"darker and cooler because something blocks direct light from the sun",kor:"그늘진",synonym:""},
+  {id:2,word:"unattractive",phrase:"unattractive offer",pos:"a",def:"not pleasant; lacking good or positive features",kor:"매력 없는",synonym:"ugly"},
+  {id:3,word:"admire",phrase:"admire a new car",pos:"v",def:"to feel respect or approval for someone or something",kor:"감탄하다",synonym:""},
+  {id:4,word:"darken",phrase:"darken the room",pos:"v",def:"to become dark or darker",kor:"어둡게하다",synonym:""},
+  {id:5,word:"relief",phrase:"sigh of relief",pos:"n",def:"a pleasant and relaxed feeling when something unpleasant stops",kor:"안도",synonym:""},
+  {id:6,word:"paradise",phrase:"earthly paradise",pos:"n",def:"a place of great happiness where everything seems perfect",kor:"낙원",synonym:"heaven"},
+];
+
+/*========================================
+  STATE
+========================================*/
+var S={
+  view:'upload', words:[], title:'Vocabulary Worksheet',
+  blanks:{word:true,kor:true,def:false},
+  loading:false, error:null, shuffled:false,
+  qrOpen:false, peerSt:'idle', peerId:null
+};
+var _peer=null;
+
+/*========================================
+  UTILS
+========================================*/
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function shuffle(a){var b=a.slice();for(var i=b.length-1;i>0;i--){var j=0|Math.random()*(i+1);var t=b[i];b[i]=b[j];b[j]=t}return b}
+function toB64(f){return new Promise(function(ok,no){var r=new FileReader();r.onload=function(){ok(r.result.split(',')[1])};r.onerror=no;r.readAsDataURL(f)})}
+
+/*========================================
+  MOBILE MODE CHECK
+========================================*/
+var _conn=new URLSearchParams(location.search).get('connect');
+
+if(_conn){
+  document.addEventListener('DOMContentLoaded',function(){bootMobile(_conn)});
+}else{
+  // PC: paste listener
+  window.addEventListener('paste',function(e){
+    if(S.view!=='upload'||S.loading)return;
+    var fs=[];var items=e.clipboardData?e.clipboardData.items:[];
+    for(var i=0;i<items.length;i++){if(items[i].kind==='file'){var f=items[i].getAsFile();if(f)fs.push(f)}}
+    if(fs.length){e.preventDefault();handleFiles(fs)}
+  });
+  document.addEventListener('DOMContentLoaded',draw);
+}
+
+/*========================================
+  MOBILE SENDER PAGE
+========================================*/
+function bootMobile(targetId){
+  var app=document.getElementById('app');
+  app.innerHTML='<div class="mobp"><div class="mobc">'+
+    '<div style="font-size:42px;margin-bottom:8px">📸</div>'+
+    '<h2>사진 전송</h2><p>촬영하면 PC로 바로 전송됩니다</p>'+
+    '<input type="file" id="mc" accept="image/*" capture="environment" style="display:none">'+
+    '<input type="file" id="mg" accept="image/*,application/pdf" multiple style="display:none">'+
+    '<button class="mbtn cam" onclick="document.getElementById(\'mc\').click()">📷 카메라 촬영</button>'+
+    '<button class="mbtn gal" onclick="document.getElementById(\'mg\').click()">🖼️ 앨범 선택</button>'+
+    '<div id="ms" class="mst w">🔗 연결 중...</div><div id="mp"></div>'+
+  '</div></div>';
+
+  function st(){return document.getElementById('ms')}
+  var conn=null;
+
+  // PeerJS가 로드되었는지 확인
+  if(typeof Peer==='undefined'){
+    st().className='mst e';
+    st().textContent='❌ PeerJS 로드 실패. 페이지를 새로고침 해보세요.';
+    return;
+  }
+
+  var p=new Peer();
+  p.on('open',function(){
+    conn=p.connect(targetId,{reliable:true});
+    conn.on('open',function(){
+      st().className='mst g';
+      st().textContent='✅ PC 연결 완료! 사진을 찍으세요';
+    });
+    conn.on('error',function(e){
+      st().className='mst e';
+      st().textContent='❌ 연결 실패: '+(e.message||e.type||'unknown');
+    });
+  });
+  p.on('error',function(e){
+    st().className='mst e';
+    st().textContent='❌ 서버 연결 실패: '+(e.message||e.type);
+  });
+
+  function send(file){
+    if(!conn||!conn.open){st().className='mst e';st().textContent='❌ 연결 끊김. QR을 다시 스캔하세요.';return}
+    st().className='mst s';st().textContent='📤 전송 중...';
+    if(file.type.startsWith('image/')){
+      document.getElementById('mp').innerHTML='<img src="'+URL.createObjectURL(file)+'" class="mimg">';
+    }
+    toB64(file).then(function(b64){
+      var CS=180000,tot=Math.ceil(b64.length/CS);
+      conn.send({t:'s',name:file.name,mime:file.type,tot:tot});
+      var i=0;
+      function next(){
+        if(i>=tot){
+          conn.send({t:'e'});
+          st().className='mst d';st().textContent='✅ 전송 완료! 추가 전송도 가능합니다';
+          return;
+        }
+        conn.send({t:'c',i:i,d:b64.slice(i*CS,(i+1)*CS)});
+        i++;
+        setTimeout(next,30);
+      }
+      next();
+    }).catch(function(e){
+      st().className='mst e';st().textContent='❌ 파일 읽기 실패';
+    });
+  }
+
+  document.getElementById('mc').onchange=function(e){if(e.target.files[0])send(e.target.files[0])};
+  document.getElementById('mg').onchange=function(e){
+    var files=e.target.files;
+    for(var i=0;i<files.length;i++)send(files[i]);
+  };
+}
+
+/*========================================
+  PC: PEER SETUP & QR
+========================================*/
+function initPeer(){
+  return new Promise(function(ok,no){
+    if(_peer&&_peer.id){ok(_peer.id);return}
+    if(typeof Peer==='undefined'){no(new Error('PeerJS가 로드되지 않았습니다. 인터넷 연결을 확인하세요.'));return}
+    _peer=new Peer();
+    _peer.on('open',function(id){S.peerId=id;ok(id)});
+    _peer.on('error',function(e){no(new Error(e.type||e.message||'Peer 오류'))});
+    _peer.on('connection',function(c){
+      upd({peerSt:'connected'});
+      var buf={chunks:[]};
+      c.on('data',function(m){
+        if(m.t==='s'){buf={name:m.name,mime:m.mime,tot:m.tot,chunks:[]}}
+        else if(m.t==='c'){buf.chunks[m.i]=m.d}
+        else if(m.t==='e'){
+          try{
+            var raw=atob(buf.chunks.join(''));
+            var bytes=new Uint8Array(raw.length);
+            for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+            var file=new File([bytes],buf.name,{type:buf.mime});
+            upd({peerSt:'idle',qrOpen:false});
+            doExtract([file]);
+          }catch(e){upd({error:'파일 조립 실패: '+e.message,qrOpen:false})}
+        }
+      });
+    });
+  });
+}
+
+function openQR(){
+  initPeer().then(function(){
+    S.qrOpen=true;S.peerSt='waiting';draw();
+    setTimeout(renderQR,200);
+  }).catch(function(e){
+    upd({error:'❌ '+e.message});
+  });
+}
+
+function renderQR(){
+  var el=document.getElementById('qr-box');
+  var urlEl=document.getElementById('qr-url');
+  if(!el||!S.peerId)return;
+
+  var base=location.href.split('?')[0];
+  var url=base+'?connect='+S.peerId;
+  el.innerHTML='';
+
+  if(typeof QRCode!=='undefined'){
+    try{
+      new QRCode(el,{text:url,width:200,height:200,colorDark:'#2c2825',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+    }catch(e){
+      el.innerHTML='<div style="padding:16px;color:red;font-size:11px">QR 생성 실패<br>아래 URL을 복사하세요</div>';
+    }
+  }else{
+    el.innerHTML='<div style="padding:16px;color:#999;font-size:11px">QR 라이브러리 로딩 중...<br>잠시 후 다시 시도하거나<br>아래 URL을 핸드폰에 직접 입력하세요</div>';
+  }
+
+  if(urlEl)urlEl.textContent=url;
+}
+
+/*========================================
+  EXTRACT WORDS VIA CLAUDE API
+========================================*/
+function doExtract(files){
+  upd({loading:true,error:null});
+
+  var parts=[];
+  var pending=files.length;
+  var idx=0;
+
+  function next(){
+    if(idx>=files.length){callAPI(parts);return}
+    var f=files[idx];idx++;
+    toB64(f).then(function(b64){
+      if(f.type==='application/pdf'){
+        parts.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}});
+      }else{
+        parts.push({type:'image',source:{type:'base64',media_type:f.type,data:b64}});
+      }
+      next();
+    }).catch(function(){
+      upd({loading:false,error:'❌ 파일 읽기 실패'});
+    });
+  }
+  next();
+}
+
+function callAPI(parts){
+  parts.push({type:'text',text:
+    '이 이미지/문서는 영어 어휘 학습 자료입니다.\n'+
+    '각 단어를 JSON 배열로 추출하세요. 순수 JSON만 출력하세요 (마크다운 코드블록 금지).\n\n'+
+    '형식: [{"word":"굵은 단어","phrase":"전체 표현","pos":"n/v/a/p/ad","def":"영영풀이","kor":"한국어뜻(≪≫안)","synonym":"유의어 또는 빈문자열"}]\n\n'+
+    'Lesson 번호가 있으면 첫 요소로 {"_title":"LESSON XX"} 추가.\n'+
+    '모든 단어 빠짐없이 추출하세요.'
+  });
+
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:8192,
+      messages:[{role:'user',content:parts}]
+    })
+  })
+  .then(function(resp){
+    if(!resp.ok)throw new Error('API 오류 ('+resp.status+')');
+    return resp.json();
+  })
+  .then(function(data){
+    var raw=(data.content||[]).map(function(c){return c.text||''}).join('');
+    var m=raw.match(/\[[\s\S]*\]/);
+    if(!m)throw new Error('JSON을 찾을 수 없습니다');
+    var arr=JSON.parse(m[0]);
+    var title='Vocabulary Worksheet';
+    var words=[];var id=1;
+    for(var i=0;i<arr.length;i++){
+      var x=arr[i];
+      if(x._title){title=x._title+' - Vocabulary Worksheet';continue}
+      if(x.word){words.push({id:id++,word:x.word,phrase:x.phrase||'',pos:x.pos||'n',def:x.def||'',kor:x.kor||'',synonym:x.synonym||''})}
+    }
+    if(!words.length)throw new Error('추출된 단어가 없습니다');
+    upd({title:title,words:words,view:'edit',loading:false,error:null});
+  })
+  .catch(function(e){
+    console.error(e);
+    upd({loading:false,error:'❌ '+e.message});
+  });
+}
+
+/*========================================
+  FILE HANDLERS
+========================================*/
+function handleFiles(fl){
+  var ok=[];
+  for(var i=0;i<fl.length;i++){
+    if(fl[i].type==='application/pdf'||fl[i].type.indexOf('image/')===0)ok.push(fl[i]);
+  }
+  if(ok.length)doExtract(ok);
+}
+
+/*========================================
+  ACTIONS
+========================================*/
+function upd(p){for(var k in p)S[k]=p[k];draw()}
+function toggleB(k){S.blanks[k]=!S.blanks[k];draw()}
+function doShuf(){S.words=shuffle(S.words);S.shuffled=true;draw()}
+function resetOrd(){S.words.sort(function(a,b){return a.id-b.id});S.shuffled=false;draw()}
+function addW(){
+  var n=1;for(var i=0;i<S.words.length;i++){if(S.words[i].id>=n)n=S.words[i].id+1}
+  S.words.push({id:n,word:'',phrase:'',pos:'n',def:'',kor:'',synonym:''});draw();
+}
+function delW(id){S.words=S.words.filter(function(w){return w.id!==id});draw()}
+function loadDemo(){S.words=DEMO.slice();S.title='LESSON 11 - Vocabulary Worksheet';S.view='edit';draw()}
+
+function doPrint(){
+  var el=document.getElementById('pz');if(!el)return;
+  var w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><title>'+esc(S.title)+'</title>'+
+  '<style>'+
+  'body{margin:24px;font-family:Georgia,serif;color:#111}'+
+  'table{width:100%;border-collapse:collapse}'+
+  'th{padding:6px 4px;font-size:10px;font-weight:700;text-align:center;border:1.5px solid #999;background:#f0f0f0}'+
+  'td{border:1px solid #bbb;vertical-align:middle}'+
+  '.cn{padding:6px 3px;text-align:center;color:#999;font-size:10px;width:24px}'+
+  '.ce{padding:14px 5px;height:48px;font-size:12px}'+
+  '.cp{padding:6px 3px;text-align:center;font-style:italic;color:#999;font-size:10px;width:24px}'+
+  '.cd{padding:14px 5px;font-size:10px;line-height:1.5;height:48px}'+
+  '.ck{padding:14px 5px;text-align:center;height:48px;font-size:12px;min-width:110px}'+
+  '.cs{padding:6px 3px;text-align:center;font-style:italic;color:#999;font-size:10px;width:60px}'+
+  '.bl{display:inline-block;border-bottom:2.5px solid #333;min-height:28px;vertical-align:bottom}'+
+  '</style></head><body>'+el.innerHTML+'</body></html>');
+  w.document.close();
+  setTimeout(function(){w.print()},400);
+}
+
+/*========================================
+  DRAW
+========================================*/
+function draw(){
+  if(_conn)return;
+  var app=document.getElementById('app');
+  var h='';
+
+  // Header
+  h+='<div class="hdr no-print"><div><h1>VOCAB WORKSHEET</h1><small>어휘 학습지 자동 생성</small></div>';
+  if(S.view!=='upload')h+='<button class="b b-lt" onclick="upd({view:\'upload\',words:[],error:null,shuffled:false})">← 새 파일</button>';
+  h+='</div><div class="wrap" id="main"></div><div class="footer no-print">VOCAB WORKSHEET MAKER</div>';
+
+  // QR Modal
+  if(S.qrOpen){
+    var cls=S.peerSt==='connected'?'g':'w';
+    var txt=S.peerSt==='connected'?'✅ 연결됨! 사진 대기 중...':'📱 QR 코드를 스캔하세요';
+    h+='<div class="ov" onclick="if(event.target===this)upd({qrOpen:false})"><div class="mdl">';
+    h+='<h3>📱 핸드폰으로 사진 전송</h3>';
+    h+='<div class="ds">QR을 스캔하면 촬영한 사진이<br>이 PC로 바로 전송됩니다</div>';
+    h+='<div id="qr-box"></div>';
+    h+='<div><span class="sbdg '+cls+'">'+txt+'</span></div>';
+    h+='<div class="ucopy" id="qr-url" onclick="if(navigator.clipboard)navigator.clipboard.writeText(this.textContent)" title="클릭하여 URL 복사">생성 중...</div>';
+    h+='<div style="margin-top:12px"><button class="b b-lt" onclick="upd({qrOpen:false})">닫기</button></div>';
+    h+='</div></div>';
+  }
+
+  app.innerHTML=h;
+  var main=document.getElementById('main');
+  if(S.view==='upload')drawUpload(main);
+  else if(S.view==='edit')drawEdit(main);
+  else if(S.view==='preview')drawPreview(main);
+
+  if(S.qrOpen&&S.peerId)setTimeout(renderQR,100);
+}
+
+/*-- Upload --*/
+function drawUpload(el){
+  var h='<div class="upload-box">';
+  h+='<div class="drop" id="dz">';
+  h+='<input type="file" id="fi" accept="image/*,application/pdf" multiple style="display:none">';
+  if(S.loading){
+    h+='<div style="font-size:38px;margin-bottom:8px"><span class="spin">⏳</span></div>';
+    h+='<h2>단어 추출 중...</h2><p>AI 분석 중입니다</p>';
+  }else{
+    h+='<div style="font-size:42px;margin-bottom:6px">📄</div>';
+    h+='<h2>어휘 교재 페이지를 업로드하세요</h2>';
+    h+='<p>PDF 또는 사진을 올리면 자동으로 학습지를 만듭니다</p>';
+    h+='<div class="methods">';
+    h+='<div class="meth"><div class="mi">📁</div><div class="ml">파일 선택</div></div>';
+    h+='<div class="meth"><div class="mi">📋</div><div class="ml">Ctrl+V</div><div class="md">붙여넣기</div></div>';
+    h+='<div class="meth blue" id="qr-btn"><div class="mi">📱</div><div class="ml" style="color:#2a6ad4">핸드폰 촬영</div><div class="md" style="color:#5a8acc">QR → PC 전송</div></div>';
+    h+='</div>';
+  }
+  h+='</div>';
+  if(S.error)h+='<div class="err">'+esc(S.error)+'</div>';
+  h+='<div style="margin-top:20px">';
+  h+='<button class="b b-gd" onclick="loadDemo()" style="font-size:14px;padding:10px 24px">📝 데모 데이터로 체험하기</button>';
+  h+='<div style="font-size:11px;color:var(--mut);margin-top:6px">네트워크 없이도 편집/미리보기/인쇄를 테스트할 수 있습니다</div>';
+  h+='</div></div>';
+  el.innerHTML=h;
+
+  var dz=document.getElementById('dz');
+  var fi=document.getElementById('fi');
+  var qb=document.getElementById('qr-btn');
+
+  dz.onclick=function(e){if(!e.target.closest('#qr-btn')&&!S.loading)fi.click()};
+  fi.onchange=function(e){handleFiles(e.target.files)};
+  dz.ondragover=function(e){e.preventDefault();dz.classList.add('over')};
+  dz.ondragleave=function(){dz.classList.remove('over')};
+  dz.ondrop=function(e){e.preventDefault();dz.classList.remove('over');handleFiles(e.dataTransfer.files)};
+  if(qb)qb.onclick=function(e){e.stopPropagation();openQR()};
+}
+
+/*-- Edit --*/
+function drawEdit(el){
+  var w=S.words,bl=S.blanks,sh=S.shuffled;
+  var h='';
+  h+='<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--mut);margin-bottom:3px">TITLE</div>';
+  h+='<input id="ti" value="'+esc(S.title)+'" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:5px;font-size:14px;font-weight:600;outline:none"></div>';
+  h+='<div class="toolbar">';
+  h+='<span class="lbl">빈칸:</span>';
+  h+='<button class="b '+(bl.word?'b-on':'b-off')+'" onclick="toggleB(\'word\')">'+(bl.word?'☑':'☐')+' 단어</button>';
+  h+='<button class="b '+(bl.kor?'b-on':'b-off')+'" onclick="toggleB(\'kor\')">'+(bl.kor?'☑':'☐')+' 한국어</button>';
+  h+='<button class="b '+(bl.def?'b-on':'b-off')+'" onclick="toggleB(\'def\')">'+(bl.def?'☑':'☐')+' 영영풀이</button>';
+  h+='<span class="sep"></span>';
+  h+='<button class="b b-gd" onclick="doShuf()">🔀 셔플</button>';
+  if(sh)h+='<button class="b b-lt" onclick="resetOrd()">↩ 원래순서</button>';
+  h+='<span style="flex:1"></span>';
+  h+='<button class="b b-dk" onclick="upd({view:\'preview\'})">👁 미리보기 →</button>';
+  h+='</div>';
+  h+='<div class="ecard"><div style="overflow-x:auto"><table class="et"><thead><tr>';
+  h+='<th style="width:28px">#</th><th>단어</th><th>표현</th><th style="width:32px">품사</th><th>영영풀이</th><th>한국어</th><th>유의어</th><th style="width:24px"></th>';
+  h+='</tr></thead><tbody id="eb"></tbody></table></div>';
+  h+='<div class="add-r"><button class="b b-lt" style="width:100%;justify-content:center;border-style:dashed" onclick="addW()">+ 단어 추가</button></div>';
+  h+='<div style="padding:3px 12px 8px;text-align:right;font-size:11px;color:var(--mut)">총 '+w.length+'개</div></div>';
+  el.innerHTML=h;
+
+  document.getElementById('ti').oninput=function(e){S.title=e.target.value};
+  var tb=document.getElementById('eb');
+  for(var i=0;i<w.length;i++){
+    (function(ww,idx){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td style="text-align:center;color:var(--mut);font-size:11px">'+(idx+1)+'</td>'+
+        '<td><input class="bld" data-id="'+ww.id+'" data-f="word" value="'+esc(ww.word)+'"></td>'+
+        '<td><input data-id="'+ww.id+'" data-f="phrase" value="'+esc(ww.phrase)+'"></td>'+
+        '<td><select data-id="'+ww.id+'" data-f="pos">'+['n','v','a','p','ad'].map(function(p){return'<option'+(ww.pos===p?' selected':'')+'>'+p+'</option>'}).join('')+'</select></td>'+
+        '<td><input class="sml" data-id="'+ww.id+'" data-f="def" value="'+esc(ww.def)+'"></td>'+
+        '<td><input data-id="'+ww.id+'" data-f="kor" value="'+esc(ww.kor)+'"></td>'+
+        '<td><input class="ita" data-id="'+ww.id+'" data-f="synonym" value="'+esc(ww.synonym)+'"></td>'+
+        '<td><button class="xb" onclick="delW('+ww.id+')">×</button></td>';
+      var inputs=tr.querySelectorAll('input,select');
+      for(var j=0;j<inputs.length;j++){
+        inputs[j].oninput=function(e){
+          var id=parseInt(e.target.getAttribute('data-id'));
+          var f=e.target.getAttribute('data-f');
+          for(var k=0;k<S.words.length;k++){if(S.words[k].id===id){S.words[k][f]=e.target.value;break}}
+        };
+      }
+      tb.appendChild(tr);
+    })(w[i],i);
+  }
+}
+
+/*-- Preview --*/
+function drawPreview(el){
+  var w=S.words,bl=S.blanks;
+  var lb=[];if(bl.word)lb.push('영어 단어');if(bl.kor)lb.push('한국어 뜻');if(bl.def)lb.push('영영풀이');
+
+  var rows='';
+  for(var i=0;i<w.length;i++){
+    var ww=w[i];
+    var bw=Math.max(150,(ww.word||'').length*13);
+    var ex;
+    if(bl.word){
+      if(ww.phrase&&ww.word&&ww.phrase.indexOf(ww.word)>=0){
+        var idx=ww.phrase.indexOf(ww.word);
+        ex=esc(ww.phrase.slice(0,idx))+'<span class="bl" style="width:'+bw+'px">&nbsp;</span>'+esc(ww.phrase.slice(idx+ww.word.length));
+      }else{
+        ex='<span class="bl" style="width:'+bw+'px">&nbsp;</span> '+esc(ww.phrase);
+      }
+    }else{
+      ex='<b>'+esc(ww.word)+'</b> '+esc((ww.phrase||'').replace(ww.word,'').trim());
+    }
+    var df=bl.def?'<span class="bl" style="width:92%">&nbsp;</span>':esc(ww.def);
+    var kr=bl.kor?'<span class="bl" style="width:110px">&nbsp;</span>':esc(ww.kor);
+    rows+='<tr><td class="cn">'+(i+1)+'</td><td class="ce">'+ex+'</td><td class="cp">'+esc(ww.pos)+'</td><td class="cd">'+df+'</td><td class="ck">'+kr+'</td><td class="cs">'+esc(ww.synonym)+'</td></tr>';
+  }
+
+  var h='';
+  h+='<div class="no-print" style="display:flex;justify-content:space-between;margin-bottom:12px">';
+  h+='<button class="b b-lt" onclick="upd({view:\'edit\'})">← 편집</button>';
+  h+='<button class="b b-dk" onclick="doPrint()">🖨 인쇄 / PDF</button></div>';
+  h+='<div class="pvw" id="pz"><div class="pvt">';
+  h+='<h2>'+esc(S.title)+'</h2>';
+  h+='<div class="nl">Name: ________________________________ &nbsp;&nbsp;&nbsp; Date: ________________________</div>';
+  if(lb.length)h+='<div class="ins">★ 빈칸에 알맞은 '+lb.join('과 ')+'을(를) 쓰시오.</div>';
+  h+='</div>';
+  h+='<table class="pv"><thead><tr>';
+  h+='<th style="width:24px">No.</th><th style="text-align:left;min-width:150px">Expression</th><th style="width:24px">품사</th>';
+  h+='<th style="text-align:left">Definition</th><th style="min-width:105px">한국어 뜻</th><th style="width:60px">Synonym</th>';
+  h+='</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  el.innerHTML=h;
+}
+</script>
+
+<!-- CDN: 동적 로드 - 실패해도 앱 안 깨짐 -->
+<script>
+// QRCode.js 로드
+(function(){
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+  s.onload=function(){console.log('✅ QRCode.js loaded')};
+  s.onerror=function(){console.warn('⚠️ QRCode.js 로드 실패 - QR 기능 제한')};
+  document.head.appendChild(s);
+})();
+// PeerJS 로드
+(function(){
+  var s=document.createElement('script');
+  s.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+  s.onload=function(){console.log('✅ PeerJS loaded')};
+  s.onerror=function(){console.warn('⚠️ PeerJS 로드 실패 - 핸드폰 전송 기능 제한')};
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
