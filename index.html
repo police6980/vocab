@@ -254,7 +254,14 @@ function bootMobile(targetId){
   addLog('PeerJS 로드 확인: ✅');
 
   addLog('Peer 생성 시도...');
-  var p=new Peer();
+  var iceConfig={iceServers:[
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun1.l.google.com:19302'},
+    {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+    {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
+    {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
+  ]};
+  var p=new Peer({config:iceConfig});
 
   p.on('open',function(myId){
     addLog('내 Peer ID: '+myId);
@@ -369,7 +376,14 @@ function initPeer(){
   });
 }
 function _doInitPeer(ok,no){
-    _peer=new Peer();
+    var iceConfig={iceServers:[
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'stun:stun1.l.google.com:19302'},
+      {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
+    ]};
+    _peer=new Peer({config:iceConfig});
     _peer.on('open',function(id){S.peerId=id;ok(id)});
     _peer.on('error',function(e){no(new Error(e.type||e.message||'Peer 오류'))});
     _peer.on('connection',function(c){
