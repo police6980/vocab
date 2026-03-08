@@ -156,6 +156,7 @@ var DEMO=[
 var S={
   view:'upload', words:[], title:'Vocabulary Worksheet',
   blanks:{word:true,kor:true,def:false},
+  wordBank:true,
   loading:false, error:null, shuffled:false,
   qrOpen:false, peerSt:'idle', peerId:null,
   apiKey:localStorage.getItem('vocabApiKey')||''
@@ -175,22 +176,11 @@ function isMobile(){return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 /*========================================
   MOBILE MODE CHECK
 ========================================*/
-var _conn=new URLSearchParams(location.search).get('connect');
-var _peerLoaded=typeof Peer!=='undefined';
-var _peerCallbacks=[];
-function onPeerReady(fn){if(_peerLoaded)fn();else _peerCallbacks.push(fn)}
-function _peerDone(){_peerLoaded=true;_peerCallbacks.forEach(function(f){f()});_peerCallbacks=[]}
+var WORKER_URL='https://vocab-proxy.police6980.workers.dev';
+var _conn=new URLSearchParams(location.search).get('room');
 
 if(_conn){
-  document.addEventListener('DOMContentLoaded',function(){
-    onPeerReady(function(){bootMobile(_conn)});
-    setTimeout(function(){
-      if(!_peerLoaded){
-        var app=document.getElementById('app');
-        if(app)app.innerHTML='<div style="padding:40px;text-align:center;color:red;font-size:16px">❌ PeerJS 로드 실패<br><br><small style="color:#666">인터넷 연결을 확인하고<br>페이지를 새로고침 해보세요</small><br><br><button onclick="location.reload()" style="padding:10px 20px;font-size:14px;border-radius:8px;border:none;background:#2c2825;color:white;cursor:pointer">🔄 새로고침</button></div>';
-      }
-    },10000);
-  });
+  document.addEventListener('DOMContentLoaded',function(){bootMobile(_conn)});
 }else{
   // PC or standalone mobile: paste listener
   window.addEventListener('paste',function(e){
@@ -205,16 +195,8 @@ if(_conn){
 /*========================================
   MOBILE SENDER PAGE (QR로 접속 시)
 ========================================*/
-function bootMobile(targetId){
+function bootMobile(roomId){
   var app=document.getElementById('app');
-  var logs=[];
-
-  function addLog(msg){
-    logs.push('['+new Date().toLocaleTimeString()+'] '+msg);
-    var logEl=document.getElementById('mlog');
-    if(logEl){logEl.textContent=logs.join('\n');logEl.scrollTop=logEl.scrollHeight}
-  }
-
   app.innerHTML='<div class="mobp"><div class="mobc">'+
     '<div style="font-size:42px;margin-bottom:8px">📸</div>'+
     '<h2>사진 전송</h2><p>촬영하면 PC로 바로 전송됩니다</p>'+
@@ -222,206 +204,103 @@ function bootMobile(targetId){
     '<input type="file" id="mg" accept="image/*,application/pdf" multiple style="display:none">'+
     '<button class="mbtn cam" id="camBtn">📷 카메라 촬영</button>'+
     '<button class="mbtn gal" id="galBtn">🖼️ 앨범 선택</button>'+
-    '<hr style="margin:12px 0;border:none;border-top:1px solid #eee">'+
-    '<button class="mbtn solo" id="soloBtn">📱 이 폰에서 직접 작업하기</button>'+
-    '<div style="font-size:10px;color:#999;margin-top:4px">PC 전송 없이 여기서 바로 학습지 만들기</div>'+
-    '<div id="ms" class="mst w">🔗 PC 연결 중...</div>'+
+    '<div id="ms" class="mst g">✅ 준비 완료! 사진을 찍으세요</div>'+
     '<div id="mp"></div>'+
-    '<div id="mlog" class="mlog"></div>'+
   '</div></div>';
 
   function st(){return document.getElementById('ms')}
-  var conn=null;
-  var peerReady=false;
-
-  // Solo mode: redirect to main page without connect param
-  document.getElementById('soloBtn').onclick=function(){
-    location.href=location.href.split('?')[0];
-  };
-
-  // Camera button
-  document.getElementById('camBtn').onclick=function(){
-    addLog('카메라 버튼 클릭');
-    document.getElementById('mc').click();
-  };
-
-  // Gallery button
-  document.getElementById('galBtn').onclick=function(){
-    addLog('앨범 버튼 클릭');
-    document.getElementById('mg').click();
-  };
-
-  addLog('PeerJS 로드 확인: ✅');
-
-  addLog('Peer 생성 시도...');
-  var iceConfig={iceServers:[
-    {urls:'stun:stun.l.google.com:19302'},
-    {urls:'stun:stun1.l.google.com:19302'},
-    {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
-    {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
-    {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
-  ]};
-  var p=new Peer({config:iceConfig});
-
-  p.on('open',function(myId){
-    addLog('내 Peer ID: '+myId);
-    addLog('PC('+targetId+')에 연결 시도...');
-    conn=p.connect(targetId,{reliable:true});
-
-    conn.on('open',function(){
-      peerReady=true;
-      st().className='mst g';
-      st().textContent='✅ PC 연결 완료! 사진을 찍으세요';
-      addLog('✅ PC 연결 성공!');
-    });
-
-    conn.on('close',function(){
-      peerReady=false;
-      st().className='mst e';
-      st().textContent='⚠️ PC 연결 끊김. QR을 다시 스캔하세요.';
-      addLog('연결 닫힘');
-    });
-
-    conn.on('error',function(e){
-      st().className='mst e';
-      st().textContent='❌ 연결 실패: '+(e.message||e.type||'unknown');
-      addLog('연결 에러: '+(e.message||e.type||JSON.stringify(e)));
-    });
-  });
-
-  p.on('error',function(e){
-    st().className='mst e';
-    st().textContent='❌ 서버 연결 실패: '+(e.message||e.type);
-    addLog('Peer 에러: '+(e.message||e.type||JSON.stringify(e)));
-  });
-
-  p.on('disconnected',function(){
-    addLog('Peer 서버에서 연결 해제됨');
-  });
 
   function send(file){
-    addLog('send() 호출 - 파일: '+file.name+' ('+Math.round(file.size/1024)+'KB)');
-
-    if(!conn||!conn.open){
-      st().className='mst e';
-      st().textContent='❌ PC와 연결이 안 되어 있습니다. QR을 다시 스캔하세요.';
-      addLog('❌ 연결 없음 - conn:'+(conn?'있음':'null')+', open:'+(conn?conn.open:'N/A'));
-      return;
-    }
     st().className='mst s';st().textContent='📤 전송 중...';
     if(file.type.startsWith('image/')){
       document.getElementById('mp').innerHTML='<img src="'+URL.createObjectURL(file)+'" class="mimg">';
     }
-    toB64(file).then(function(b64){
-      addLog('Base64 변환 완료 ('+Math.round(b64.length/1024)+'KB)');
-      var CS=180000,tot=Math.ceil(b64.length/CS);
-      addLog('청크 수: '+tot);
-      conn.send({t:'s',name:file.name,mime:file.type,tot:tot});
-      var i=0;
-      function next(){
-        if(i>=tot){
-          conn.send({t:'e'});
+    var reader=new FileReader();
+    reader.onload=function(){
+      var b64=reader.result;
+      var payload=JSON.stringify({name:file.name,mime:file.type,data:b64});
+      fetch(WORKER_URL+'/upload/'+roomId,{
+        method:'POST',
+        body:payload
+      }).then(function(r){
+        if(r.ok){
           st().className='mst d';st().textContent='✅ 전송 완료! 추가 전송도 가능합니다';
-          addLog('✅ 전송 완료');
-          return;
+        }else{
+          st().className='mst e';st().textContent='❌ 전송 실패 ('+r.status+')';
         }
-        conn.send({t:'c',i:i,d:b64.slice(i*CS,(i+1)*CS)});
-        i++;
-        var pct=Math.round(i/tot*100);
-        st().textContent='📤 전송 중... '+pct+'%';
-        setTimeout(next,30);
-      }
-      next();
-    }).catch(function(e){
-      st().className='mst e';st().textContent='❌ 파일 읽기 실패';
-      addLog('❌ 파일 읽기 실패: '+(e.message||e));
-    });
+      }).catch(function(e){
+        st().className='mst e';st().textContent='❌ 전송 실패: '+e.message;
+      });
+    };
+    reader.readAsDataURL(file);
   }
 
-  // File input handlers - use addEventListener for better mobile compatibility
+  document.getElementById('camBtn').onclick=function(){document.getElementById('mc').click()};
+  document.getElementById('galBtn').onclick=function(){document.getElementById('mg').click()};
   document.getElementById('mc').addEventListener('change',function(e){
-    addLog('카메라 change 이벤트 발생, files: '+(e.target.files?e.target.files.length:0));
-    if(e.target.files&&e.target.files[0]){
-      send(e.target.files[0]);
-    }
-    // Reset so same file can be selected again
+    if(e.target.files&&e.target.files[0])send(e.target.files[0]);
     e.target.value='';
   });
-
   document.getElementById('mg').addEventListener('change',function(e){
-    addLog('앨범 change 이벤트 발생, files: '+(e.target.files?e.target.files.length:0));
-    var files=e.target.files;
-    if(files){
-      for(var i=0;i<files.length;i++)send(files[i]);
-    }
+    if(e.target.files){for(var i=0;i<e.target.files.length;i++)send(e.target.files[i])}
     e.target.value='';
   });
 }
 
 /*========================================
-  PC: PEER SETUP & QR
+  PC: ROOM & QR (Worker Relay)
 ========================================*/
-function initPeer(){
-  return new Promise(function(ok,no){
-    if(_peer&&_peer.id){ok(_peer.id);return}
-    if(!_peerLoaded){
-      onPeerReady(function(){
-        if(typeof Peer==='undefined'){no(new Error('PeerJS 로드 실패. 새로고침 해보세요.'));return}
-        _doInitPeer(ok,no);
-      });
-      return;
-    }
-    if(typeof Peer==='undefined'){no(new Error('PeerJS가 로드되지 않았습니다. 인터넷 연결을 확인하세요.'));return}
-    _doInitPeer(ok,no);
-  });
+var _roomId=null;
+var _polling=false;
+
+function generateRoom(){
+  return Math.random().toString(36).substr(2,8);
 }
-function _doInitPeer(ok,no){
-    var iceConfig={iceServers:[
-      {urls:'stun:stun.l.google.com:19302'},
-      {urls:'stun:stun1.l.google.com:19302'},
-      {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
-      {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
-      {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
-    ]};
-    _peer=new Peer({config:iceConfig});
-    _peer.on('open',function(id){S.peerId=id;ok(id)});
-    _peer.on('error',function(e){no(new Error(e.type||e.message||'Peer 오류'))});
-    _peer.on('connection',function(c){
-      upd({peerSt:'connected'});
-      var buf={chunks:[]};
-      c.on('data',function(m){
-        if(m.t==='s'){buf={name:m.name,mime:m.mime,tot:m.tot,chunks:[]}}
-        else if(m.t==='c'){buf.chunks[m.i]=m.d}
-        else if(m.t==='e'){
-          try{
-            var raw=atob(buf.chunks.join(''));
-            var bytes=new Uint8Array(raw.length);
-            for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-            var file=new File([bytes],buf.name,{type:buf.mime});
-            upd({peerSt:'idle',qrOpen:false});
-            doExtract([file]);
-          }catch(e){upd({error:'파일 조립 실패: '+e.message,qrOpen:false})}
+
+function startPolling(){
+  if(_polling)return;
+  _polling=true;
+  function poll(){
+    if(!_polling)return;
+    fetch(WORKER_URL+'/poll/'+_roomId)
+      .then(function(r){return r.json()})
+      .then(function(data){
+        if(data.waiting){
+          setTimeout(poll,2000);
+        }else if(data.data){
+          // Photo received!
+          _polling=false;
+          var b64=data.data;
+          var name=data.name||'photo.jpg';
+          var mime=data.mime||'image/jpeg';
+          // Convert data URL to File
+          var raw=atob(b64.split(',')[1]);
+          var bytes=new Uint8Array(raw.length);
+          for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+          var file=new File([bytes],name,{type:mime});
+          upd({qrOpen:false});
+          doExtract([file]);
         }
-      });
-    });
+      })
+      .catch(function(){setTimeout(poll,3000)});
+  }
+  poll();
 }
 
 function openQR(){
-  initPeer().then(function(){
-    S.qrOpen=true;S.peerSt='waiting';draw();
-    setTimeout(renderQR,200);
-  }).catch(function(e){
-    upd({error:'❌ '+e.message});
-  });
+  _roomId=generateRoom();
+  S.qrOpen=true;S.peerSt='waiting';draw();
+  setTimeout(renderQR,200);
+  startPolling();
 }
 
 function renderQR(){
   var el=document.getElementById('qr-box');
   var urlEl=document.getElementById('qr-url');
-  if(!el||!S.peerId)return;
+  if(!el||!_roomId)return;
 
   var base=location.href.split('?')[0];
-  var url=base+'?connect='+S.peerId;
+  var url=base+'?room='+_roomId;
   el.innerHTML='';
 
   if(typeof QRCode!=='undefined'){
@@ -431,7 +310,7 @@ function renderQR(){
       el.innerHTML='<div style="padding:16px;color:red;font-size:11px">QR 생성 실패<br>아래 URL을 복사하세요</div>';
     }
   }else{
-    el.innerHTML='<div style="padding:16px;color:#999;font-size:11px">QR 라이브러리 로딩 중...<br>잠시 후 다시 시도하거나<br>아래 URL을 핸드폰에 직접 입력하세요</div>';
+    el.innerHTML='<div style="padding:16px;color:#999;font-size:11px">QR 라이브러리 로딩 중...</div>';
   }
 
   if(urlEl)urlEl.textContent=url;
@@ -502,7 +381,7 @@ function callAPI(parts){
       method:'POST',
       headers:{
         'Content-Type':'application/json',
-        'x-api-key':S.apiKey,
+        'x-api-key':S.apiKey.replace(/[^\x20-\x7E]/g,'').trim(),
         'anthropic-version':'2023-06-01'
       },
       body:JSON.stringify(body)
@@ -620,7 +499,7 @@ function openApiKeyModal(){
   document.getElementById('api-key-input').focus();
 }
 function saveApiKey(){
-  var v=document.getElementById('api-key-input').value.trim();
+  var v=document.getElementById('api-key-input').value.replace(/[^\x20-\x7E]/g,'').trim();
   S.apiKey=v;
   try{localStorage.setItem('vocabApiKey',v)}catch(e){}
   document.getElementById('apikey-modal').remove();
@@ -643,8 +522,8 @@ function draw(){
 
   // QR Modal
   if(S.qrOpen){
-    var cls=S.peerSt==='connected'?'g':'w';
-    var txt=S.peerSt==='connected'?'✅ 연결됨! 사진 대기 중...':'📱 QR 코드를 스캔하세요';
+    var cls='g';
+    var txt='📱 QR 코드를 스캔하세요 — 사진 촬영 시 자동 수신됩니다';
     h+='<div class="ov" onclick="if(event.target===this)upd({qrOpen:false})"><div class="mdl">';
     h+='<h3>📱 핸드폰으로 사진 전송</h3>';
     h+='<div class="ds">QR을 스캔하면 촬영한 사진이<br>이 PC로 바로 전송됩니다</div>';
@@ -796,6 +675,7 @@ function drawEdit(el){
   h+='<button class="b '+(bl.word?'b-on':'b-off')+'" onclick="toggleB(\'word\')">'+(bl.word?'☑':'☐')+' 단어</button>';
   h+='<button class="b '+(bl.kor?'b-on':'b-off')+'" onclick="toggleB(\'kor\')">'+(bl.kor?'☑':'☐')+' 한국어</button>';
   h+='<button class="b '+(bl.def?'b-on':'b-off')+'" onclick="toggleB(\'def\')">'+(bl.def?'☑':'☐')+' 영영풀이</button>';
+  h+='<button class="b '+(S.wordBank?'b-on':'b-off')+'" onclick="S.wordBank=!S.wordBank;draw()" style="margin-left:4px">'+(S.wordBank?'☑':'☐')+' 보기(Word Bank)</button>';
   h+='<span class="sep"></span>';
   h+='<button class="b b-gd" onclick="flushInputs();doShuf()">🔀 셔플</button>';
   if(sh)h+='<button class="b b-lt" onclick="flushInputs();resetOrd()">↩ 원래순서</button>';
@@ -913,7 +793,26 @@ function drawPreview(el){
   h+='<table class="pv"><thead><tr>';
   h+='<th style="width:24px">No.</th><th style="text-align:left;min-width:150px">Expression</th><th style="width:24px">품사</th>';
   h+='<th style="text-align:left">Definition</th><th style="min-width:105px">한국어 뜻</th><th style="width:60px">Synonym</th>';
-  h+='</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  h+='</tr></thead><tbody>'+rows+'</tbody></table>';
+
+  // Word Bank - 빈칸 단어들을 섞어서 보기로 제공
+  if(S.wordBank&&bl.word){
+    var bankWords=[];
+    for(var j=0;j<w.length;j++){
+      var bw2=w[j].blank||w[j].word;
+      if(bw2)bankWords.push(bw2);
+    }
+    bankWords=shuffle(bankWords);
+    h+='<div style="margin-top:16px;padding:12px 16px;border:2px solid #999;border-radius:8px;background:#fafafa">';
+    h+='<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:8px;letter-spacing:1px">WORD BANK</div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:10px 18px;font-size:13px;font-family:Georgia,serif">';
+    for(var j=0;j<bankWords.length;j++){
+      h+='<span>'+esc(bankWords[j])+'</span>';
+    }
+    h+='</div></div>';
+  }
+
+  h+='</div>';
   el.innerHTML=h;
 }
 </script>
@@ -938,24 +837,7 @@ function drawPreview(el){
   }
   tryNext();
 })();
-// PeerJS 로드 - 여러 CDN 순차 시도
-(function(){
-  var urls=[
-    'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js',
-    'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js'
-  ];
-  var i=0;
-  function tryNext(){
-    if(i>=urls.length){console.warn('⚠️ 모든 PeerJS CDN 실패');return}
-    var s=document.createElement('script');
-    s.src=urls[i];i++;
-    s.onload=function(){console.log('✅ PeerJS loaded from '+s.src);if(typeof _peerDone==='function')_peerDone()};
-    s.onerror=function(){console.warn('❌ PeerJS 실패: '+s.src);tryNext()};
-    document.head.appendChild(s);
-  }
-  tryNext();
-})();
+// PeerJS removed - using Worker relay
 </script>
 </body>
 </html>
