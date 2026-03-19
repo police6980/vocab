@@ -625,12 +625,59 @@ function flushInputs(){
 }
 
 function goPreview(){flushInputs();S.view='preview';draw()}
-function setBlank(id,val){
+function toggleBlankWord(id,wordIdx){
   flushInputs();
   for(var k=0;k<S.words.length;k++){
-    if(S.words[k].id===id){S.words[k].blank=val;S.words[k].word=val;break}
+    if(S.words[k].id===id){
+      var ww=S.words[k];
+      var phraseWords=(ww.phrase||'').split(/\s+/).filter(function(x){return x});
+      // Track selected indices
+      if(!ww._selIdx)ww._selIdx=[];
+      var pos=ww._selIdx.indexOf(wordIdx);
+      if(pos>=0){ww._selIdx.splice(pos,1)}else{ww._selIdx.push(wordIdx)}
+      ww._selIdx.sort(function(a,b){return a-b});
+      // Build blank from selected words
+      if(ww._selIdx.length>0){
+        var parts=[];
+        for(var s=0;s<ww._selIdx.length;s++){
+          if(phraseWords[ww._selIdx[s]])parts.push(phraseWords[ww._selIdx[s]]);
+        }
+        ww.blank=parts.join(' ');
+      }else{
+        ww.blank='';
+      }
+      ww.word=ww.blank;
+      break;
+    }
   }
   draw();
+}
+// Initialize _selIdx from blank when loading data
+function initSelIdx(ww){
+  if(ww._selIdx)return;
+  var phraseWords=(ww.phrase||'').split(/\s+/).filter(function(x){return x});
+  var blankWords=(ww.blank||'').split(/\s+/).filter(function(x){return x});
+  ww._selIdx=[];
+  if(blankWords.length===0)return;
+  // Find consecutive match
+  for(var start=0;start<=phraseWords.length-blankWords.length;start++){
+    var match=true;
+    for(var b=0;b<blankWords.length;b++){
+      if(phraseWords[start+b].toLowerCase()!==blankWords[b].toLowerCase()){match=false;break}
+    }
+    if(match){
+      for(var b=0;b<blankWords.length;b++)ww._selIdx.push(start+b);
+      return;
+    }
+  }
+  // Fallback: match individual words
+  for(var b=0;b<blankWords.length;b++){
+    for(var p=0;p<phraseWords.length;p++){
+      if(phraseWords[p].toLowerCase()===blankWords[b].toLowerCase()&&ww._selIdx.indexOf(p)<0){
+        ww._selIdx.push(p);break;
+      }
+    }
+  }
 }
 
 function editPhrase(id){
@@ -652,6 +699,7 @@ function confirmPhrase(id){
   for(var k=0;k<S.words.length;k++){
     if(S.words[k].id===id){
       S.words[k].phrase=newPhrase;
+      S.words[k]._selIdx=null; // reset selection
       var newWords=newPhrase.split(/\s+/).filter(function(x){return x});
       var found=false;
       for(var n=0;n<newWords.length;n++){
@@ -659,6 +707,7 @@ function confirmPhrase(id){
       }
       if(!found&&newWords.length>0)S.words[k].blank=newWords[0];
       S.words[k].word=S.words[k].blank;
+      initSelIdx(S.words[k]);
       break;
     }
   }
@@ -683,7 +732,7 @@ function drawEdit(el){
   h+='<button class="b b-dk" onclick="goPreview()">👁 미리보기 →</button>';
   h+='</div>';
   h+='<div style="background:#faf6ee;border:1px solid var(--bdr);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#6a6560">';
-  h+='💡 <b>표현</b> 열: 단어 클릭→빈칸 선택(금색), ✏️→표현 수정 후 확정</div>';
+  h+='💡 <b>표현</b> 열: 단어를 클릭하면 빈칸 대상(금색)이 됩니다. 여러 단어를 선택하면 묶음으로 빈칸이 됩니다. ✏️→표현 수정</div>';
   h+='<div class="ecard"><div style="overflow-x:auto"><table class="et"><thead><tr>';
   h+='<th style="width:28px">#</th><th style="min-width:80px">빈칸 단어</th><th>표현 <span style="font-weight:400;font-size:10px;color:var(--mut)">(클릭→빈칸, ✏️→수정)</span></th><th style="width:32px">품사</th><th>영영풀이</th><th>한국어</th><th>유의어</th><th style="width:24px"></th>';
   h+='</tr></thead><tbody id="eb"></tbody></table></div>';
@@ -696,12 +745,13 @@ function drawEdit(el){
   for(var i=0;i<w.length;i++){
     (function(ww,idx){
       var tr=document.createElement('tr');
+      initSelIdx(ww);
       var phraseWords=(ww.phrase||'').split(/\s+/).filter(function(x){return x});
       var phraseHtml='<div class="pw-wrap" id="pw-'+ww.id+'">';
       for(var p=0;p<phraseWords.length;p++){
         var pw=phraseWords[p];
-        var isBlank=pw.toLowerCase()===((ww.blank||'').toLowerCase());
-        phraseHtml+='<span class="pw'+(isBlank?' pw-sel':'')+'" onclick="setBlank('+ww.id+',\''+pw.replace(/'/g,"\'")+'\')" title="클릭→빈칸 대상">'+esc(pw)+'</span> ';
+        var isSel=(ww._selIdx||[]).indexOf(p)>=0;
+        phraseHtml+='<span class="pw'+(isSel?' pw-sel':'')+'" onclick="toggleBlankWord('+ww.id+','+p+')" title="클릭→빈칸 토글">'+esc(pw)+'</span> ';
       }
       phraseHtml+='<span class="pw-edit" onclick="editPhrase('+ww.id+')" title="표현 수정">✏️</span>';
       phraseHtml+='</div>';
