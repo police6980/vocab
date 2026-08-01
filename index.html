@@ -159,7 +159,7 @@ var S={
   wordBank:true,
   loading:false, error:null, shuffled:false,
   qrOpen:false, peerSt:'idle', peerId:null,
-  apiKey:localStorage.getItem('vocabApiKey')||''
+  apiKey:localStorage.getItem('vocabGeminiKey')||''
 };
 var _peer=null;
 
@@ -317,7 +317,7 @@ function renderQR(){
 }
 
 /*========================================
-  EXTRACT WORDS VIA CLAUDE API
+  EXTRACT WORDS VIA GEMINI API
 ========================================*/
 function doExtract(files){
   upd({loading:true,error:null});
@@ -329,11 +329,7 @@ function doExtract(files){
     if(idx>=files.length){callAPI(parts);return}
     var f=files[idx];idx++;
     toB64(f).then(function(b64){
-      if(f.type==='application/pdf'){
-        parts.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}});
-      }else{
-        parts.push({type:'image',source:{type:'base64',media_type:f.type,data:b64}});
-      }
+      parts.push({inline_data:{mime_type:f.type,data:b64}});
       next();
     }).catch(function(){
       upd({loading:false,error:'❌ 파일 읽기 실패'});
@@ -343,7 +339,7 @@ function doExtract(files){
 }
 
 function callAPI(parts){
-  parts.push({type:'text',text:
+  parts.push({text:
     '이 이미지/문서는 영어 어휘 학습 자료입니다.\n'+
     '각 단어를 JSON 배열로 추출하세요. 순수 JSON만 출력하세요 (마크다운 코드블록 금지).\n\n'+
     '형식: [{"word":"굵은 단어","phrase":"전체 표현","pos":"n/v/a/p/ad","def":"영영풀이","kor":"한국어뜻(≪≫안)","synonym":"유의어 또는 빈문자열"}]\n\n'+
@@ -356,12 +352,18 @@ function callAPI(parts){
     return;
   }
 
-  var apiUrl='https://vocab-proxy.police6980.workers.dev';
-  var models=['claude-haiku-4-5-20251001','claude-sonnet-4-20250514'];
-  var bodyBase={max_tokens:8192,messages:[{role:'user',content:parts}]};
+  var MODEL='gemini-3.6-flash';
+  var apiUrl='https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent';
+  var body={
+    contents:[{role:'user',parts:parts}],
+    generationConfig:{
+      maxOutputTokens:32768,
+      responseMimeType:'application/json',
+      mediaResolution:'MEDIA_RESOLUTION_HIGH'
+    }
+  };
 
-  function tryCall(modelIdx,attempt){
-    var model=models[modelIdx];
+  function tryCall(attempt){
     var maxAttempt=3;
     upd({error:null});
     if(attempt>0){
@@ -369,38 +371,29 @@ function callAPI(parts){
       if(el){
         var info=document.createElement('div');
         info.style.cssText='color:var(--acc);font-size:13px;text-align:center;padding:6px';
-        info.textContent='⏳ 재시도 중... ('+model+', '+(attempt+1)+'/'+maxAttempt+'회)';
+        info.textContent='⏳ 재시도 중... ('+(attempt+1)+'/'+maxAttempt+'회)';
         el.parentNode&&el.parentNode.insertBefore(info,el);
       }
     }
-
-    var body=JSON.parse(JSON.stringify(bodyBase));
-    body.model=model;
 
     fetch(apiUrl,{
       method:'POST',
       headers:{
         'Content-Type':'application/json',
-        'x-api-key':S.apiKey.replace(/[^\x20-\x7E]/g,'').trim(),
-        'anthropic-version':'2023-06-01'
+        'x-goog-api-key':S.apiKey.replace(/[^\x20-\x7E]/g,'').trim()
       },
       body:JSON.stringify(body)
     })
     .then(function(resp){
       return resp.json().then(function(data){
         if(!resp.ok){
-          var msg=data.error?data.error.message:'HTTP '+resp.status;
-          // Overloaded or rate limit → retry
-          if((resp.status===529||resp.status===429||msg.toLowerCase().indexOf('overload')>=0)&&attempt<maxAttempt-1){
-            var delay=3000*(attempt+1);
-            setTimeout(function(){tryCall(modelIdx,attempt+1)},delay);
+          var msg=(data&&data.error&&data.error.message)?data.error.message:'HTTP '+resp.status;
+          // Rate limit / overload / transient server error → retry
+          if((resp.status===429||resp.status===500||resp.status===503)&&attempt<maxAttempt-1){
+            setTimeout(function(){tryCall(attempt+1)},3000*(attempt+1));
             return null;
           }
-          // All retries failed for this model → try next model
-          if((resp.status===529||resp.status===429||msg.toLowerCase().indexOf('overload')>=0)&&modelIdx<models.length-1){
-            setTimeout(function(){tryCall(modelIdx+1,0)},2000);
-            return null;
-          }
+          if(resp.status===400&&msg.indexOf('API key')>=0)throw new Error('API 키가 올바르지 않습니다 (상단 🔑 버튼)');
           throw new Error(msg);
         }
         return data;
@@ -408,7 +401,14 @@ function callAPI(parts){
     })
     .then(function(data){
       if(!data)return; // retry in progress
-      var raw=(data.content||[]).map(function(c){return c.text||''}).join('');
+      var cand=(data.candidates||[])[0];
+      if(!cand){
+        var blk=data.promptFeedback&&data.promptFeedback.blockReason;
+        throw new Error(blk?('요청이 차단되었습니다 ('+blk+')'):'응답이 비어 있습니다');
+      }
+      var raw=(((cand.content||{}).parts)||[]).filter(function(p){return !p.thought}).map(function(p){return p.text||''}).join('');
+      if(cand.finishReason==='MAX_TOKENS')throw new Error('응답이 잘렸습니다. 파일을 나눠서 올려보세요');
+      if(!raw)throw new Error('응답이 비어 있습니다 ('+(cand.finishReason||'unknown')+')');
       var m=raw.match(/\[[\s\S]*\]/);
       if(!m)throw new Error('JSON을 찾을 수 없습니다');
       var arr=JSON.parse(m[0]);
@@ -428,7 +428,7 @@ function callAPI(parts){
     });
   }
 
-  tryCall(0,0);
+  tryCall(0);
 }
 
 /*========================================
@@ -488,9 +488,9 @@ function openApiKeyModal(){
   d.className='ov';
   d.onclick=function(e){if(e.target===d)d.remove()};
   d.innerHTML='<div class="mdl" style="max-width:420px">'+
-    '<h3>🔑 Claude API 키 설정</h3>'+
-    '<div class="ds" style="margin-bottom:12px">사진에서 단어를 자동 추출하려면 API 키가 필요합니다.<br><a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--acc)">console.anthropic.com</a>에서 발급받으세요.</div>'+
-    '<input type="password" id="api-key-input" value="'+(S.apiKey||'')+'" placeholder="sk-ant-..." style="width:100%;padding:10px;border:1px solid var(--bdr);border-radius:6px;font-size:14px;font-family:monospace;box-sizing:border-box">'+
+    '<h3>🔑 Gemini API 키 설정</h3>'+
+    '<div class="ds" style="margin-bottom:12px">사진에서 단어를 자동 추출하려면 API 키가 필요합니다.<br><a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--acc)">aistudio.google.com/apikey</a>에서 발급받으세요.</div>'+
+    '<input type="password" id="api-key-input" value="'+esc(S.apiKey||'')+'" placeholder="AIza..." style="width:100%;padding:10px;border:1px solid var(--bdr);border-radius:6px;font-size:14px;font-family:monospace;box-sizing:border-box">'+
     '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">'+
     '<button class="b b-lt" onclick="document.getElementById(\'apikey-modal\').remove()">취소</button>'+
     '<button class="b b-gd" onclick="saveApiKey()">저장</button>'+
@@ -501,7 +501,7 @@ function openApiKeyModal(){
 function saveApiKey(){
   var v=document.getElementById('api-key-input').value.replace(/[^\x20-\x7E]/g,'').trim();
   S.apiKey=v;
-  try{localStorage.setItem('vocabApiKey',v)}catch(e){}
+  try{localStorage.setItem('vocabGeminiKey',v)}catch(e){}
   document.getElementById('apikey-modal').remove();
   draw();
 }
